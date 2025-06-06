@@ -28,12 +28,6 @@ namespace HairvestMoon.UI
             bus.InventoryChanged += RefreshUI;
         }
 
-        private void OnDisable()
-        {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.InventoryChanged -= RefreshUI;
-        }
-
         private void BuildUI()
         {
             // Build Seeds

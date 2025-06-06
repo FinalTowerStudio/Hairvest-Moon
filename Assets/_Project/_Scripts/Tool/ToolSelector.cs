@@ -24,7 +24,7 @@ namespace HairvestMoon.Tool
 
         private int currentIndex = 0;
 
-        public void InitialSetTool()
+        public void Initialize()
         {
             SetTool(toolOrder[currentIndex]);
         }

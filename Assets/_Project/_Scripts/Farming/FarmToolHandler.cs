@@ -12,7 +12,7 @@ namespace HairvestMoon.Farming
     /// <summary>
     /// Handles farm tool interactions (Hoe, Water, Plant, Harvest) using the new input system.
     /// </summary>
-    public class FarmToolHandler : MonoBehaviour
+    public class FarmToolHandler : MonoBehaviour, IBusListener
     {
         public enum ToolSlot { None, Hoe = 1, Water = 2, Plant = 3, Harvest = 4 }
 
@@ -27,25 +27,31 @@ namespace HairvestMoon.Farming
         private TileTargetingSystem targetingSystem;
         private float currentHoldTime;
         private bool isInteracting;
+        private bool isInitialized = false;
         private Vector3Int? targetTile;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
 
         public void Initialize()
         {
             targetingSystem = ServiceLocator.Get<TileTargetingSystem>();
             interactAction.action.performed += OnInteractPerformed;
             interactAction.action.canceled += OnInteractCanceled;
-        }
-
-
-        private void OnDisable()
-        {
-            interactAction.action.performed -= OnInteractPerformed;
-            interactAction.action.canceled -= OnInteractCanceled;
+            isInitialized = true;
         }
 
         private void Update()
         {
-            if (!isInteracting) return;
+            if (!isInteracting || !isInitialized) return;
 
             targetTile = targetingSystem.CurrentTargetedTile;
             if (!targetTile.HasValue) return;
@@ -184,14 +190,14 @@ namespace HairvestMoon.Farming
         {
             if (data.isTilled && data.plantedCrop == null && selectedSeed != null)
             {
-                int seedCount = ServiceLocator.Get<InventorySystem>().GetQuantity(selectedSeed.seedItem);
+                int seedCount = ServiceLocator.Get<ResourceInventorySystem>().GetQuantity(selectedSeed.seedItem);
                 if (seedCount <= 0)
                 {
                     ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("No seeds available");
                     return;
                 }
 
-                bool removed = ServiceLocator.Get<InventorySystem>().RemoveItem(selectedSeed.seedItem, 1);
+                bool removed = ServiceLocator.Get<ResourceInventorySystem>().RemoveItem(selectedSeed.seedItem, 1);
                 if (!removed)
                 {
                     ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Failed to consume seed");
@@ -215,7 +221,7 @@ namespace HairvestMoon.Farming
                 var harvestedItem = data.plantedCrop.harvestedItem;
                 var yield = data.plantedCrop.harvestYield;
 
-                bool added = ServiceLocator.Get<InventorySystem>().AddItem(harvestedItem, yield);
+                bool added = ServiceLocator.Get<ResourceInventorySystem>().AddItem(harvestedItem, yield);
 
                 if (added)
                 {

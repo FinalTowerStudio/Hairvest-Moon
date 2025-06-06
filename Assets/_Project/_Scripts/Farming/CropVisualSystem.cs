@@ -10,21 +10,35 @@ namespace HairvestMoon.Farming
     public class CropVisualSystem : MonoBehaviour, IBusListener
     {
         private Tilemap cropTilemap;
-
-        private void Start()
-        {
-            cropTilemap = ServiceLocator.Get<FarmTileDataManager>().CropTilemap;
-        }
+        private bool isInitialized = false;
 
         public void RegisterBusListeners()
         {
             var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
             bus.TimeChanged += OnRefreshCropVisuals;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+            isInitialized = true;
+        }
+
+        public void Initialize()
+        {
+            cropTilemap = ServiceLocator.Get<FarmTileDataManager>().CropTilemap;
+            RefreshAllCrops();
         }
 
         private void OnRefreshCropVisuals(TimeChangedArgs args)
         {
-            var cropTilemap = ServiceLocator.Get<FarmTileDataManager>().CropTilemap;
+            if (!isInitialized) return;
+            RefreshAllCrops();
+        }
+
+        private void RefreshAllCrops()
+        {
             foreach (var entry in ServiceLocator.Get<FarmTileDataManager>().AllTileData)
             {
                 var pos = entry.Key;
@@ -47,6 +61,5 @@ namespace HairvestMoon.Farming
                 cropTilemap.SetTile(pos, tile);
             }
         }
-
     }
 }

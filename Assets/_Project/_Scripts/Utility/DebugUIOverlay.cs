@@ -22,8 +22,20 @@ namespace HairvestMoon.Utility
         private GameTimeManager _gameTimeManager;
         private PlayerStateController _playerStateController;
         private FarmToolHandler _farmToolHandler;
+        private bool isInitialized = false;
 
-        public void Initialize()
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            isInitialized = true;
+        }
+
+        public void InitializeUI()
         {
             _gameTimeManager = ServiceLocator.Get<GameTimeManager>();
             _playerStateController = ServiceLocator.Get<PlayerStateController>();
@@ -32,9 +44,11 @@ namespace HairvestMoon.Utility
 
         private void Update()
         {
-           dayText.text = $"Day: {_gameTimeManager.Day}";
+            if (!isInitialized) return;
 
-           formText.text = $"Form: {_playerStateController.CurrentForm}";
+            dayText.text = $"Day: {_gameTimeManager.Day}";
+
+            formText.text = $"Form: {_playerStateController.CurrentForm}";
         }
 
         public void UpdateTimeText(int hour, int minute)

@@ -10,9 +10,24 @@ public class WaterVisualSystem : MonoBehaviour
     [SerializeField] private float tileOffsetY = 1.0f;
 
     private Dictionary<Vector3Int, WaterSliderInstance> activeSliders = new();
+    private bool isInitialized = false;
+
+    public void RegisterBusListeners()
+    {
+        var bus = ServiceLocator.Get<GameEventBus>();
+        bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+    }
+
+    private void OnGlobalSystemsInitialized()
+    {
+        RefreshSliders(0, 0);
+        isInitialized = true;
+    }
 
     private void Update()
     {
+        if (!isInitialized) return;
+
         foreach (var entry in activeSliders)
         {
             var pos = entry.Key;
@@ -23,6 +38,7 @@ public class WaterVisualSystem : MonoBehaviour
         }
     }
 
+    //This isn't being called, we need to see if this is uneccessary now, or if we are missing a call to it
     public void RefreshSliders(int hour, int minute)
     {
         foreach (var entry in ServiceLocator.Get<FarmTileDataManager>().AllTileData)

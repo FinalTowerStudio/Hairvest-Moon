@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace HairvestMoon.Inventory
 {
-    public class BackpackInventorySystem : MonoBehaviour
+    public class BackpackInventorySystem : MonoBehaviour, IBusListener
     {
         [System.Serializable]
         public class BackpackSlot
@@ -18,6 +18,17 @@ namespace HairvestMoon.Inventory
         public List<BackpackSlot> backpack = new();
         
         [NonSerialized] public int maxBackpackSlots;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            // No initialization currently required.
+        }
 
         public bool CanAddItem(ItemData newItem, int amount = 1)
         {

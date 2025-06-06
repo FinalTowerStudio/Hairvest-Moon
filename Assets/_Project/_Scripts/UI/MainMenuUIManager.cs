@@ -20,9 +20,11 @@ namespace HairvestMoon.UI
 
         private int currentTabIndex = 0;
         private GameObject[] allPanels;
+        private CanvasGroup mainMenuCanvasGroup;
 
         public void InitializeUI()
         {
+            mainMenuCanvasGroup = GetComponent<CanvasGroup>();
             allPanels = new GameObject[] { inventoryPanel, cropLogPanel, mapPanel, questPanel, settingsPanel };
             CloseMenu();
         }
@@ -36,15 +38,16 @@ namespace HairvestMoon.UI
         public void OpenMenu()
         {
             gameObject.SetActive(true);
-            ServiceLocator.Get<GameStateManager>().SetState(GameState.Menu);
-            OpenTab(0);
+            mainMenuCanvasGroup.alpha = 1f;
+            mainMenuCanvasGroup.interactable = true;
+            mainMenuCanvasGroup.blocksRaycasts = true;
         }
 
         public void CloseMenu()
         {
-            gameObject.SetActive(false);
-            if (ServiceLocator.Get<GameStateManager>().CurrentState == GameState.Menu)
-                ServiceLocator.Get<GameStateManager>().SetState(GameState.FreeRoam);
+            mainMenuCanvasGroup.alpha = 0f;
+            mainMenuCanvasGroup.interactable = false;
+            mainMenuCanvasGroup.blocksRaycasts = false;
         }
 
         private void HandleMenuToggle()
@@ -60,18 +63,22 @@ namespace HairvestMoon.UI
             currentTabIndex = index;
 
             for (int i = 0; i < allPanels.Length; i++)
-                allPanels[i].SetActive(i == currentTabIndex);
+            {
+                var canvasGroup = allPanels[i].GetComponent<CanvasGroup>();
+                bool active = (i == currentTabIndex);
+
+                canvasGroup.alpha = active ? 1f : 0f;
+                canvasGroup.interactable = active;
+                canvasGroup.blocksRaycasts = active;
+            }
 
             if (currentTabIndex == 0)
-            {
-               inventoryPanel.GetComponent<BackpackInventoryUI>().RefreshUI();
-            }
+                inventoryPanel.GetComponent<BackpackInventoryUI>().RefreshUI();
 
             if (currentTabIndex == 1)
-            {
                 cropLogPanel.GetComponent<InventoryOverviewUI>().RefreshUI();
-            }
         }
+
 
         public void NextTab()
         {

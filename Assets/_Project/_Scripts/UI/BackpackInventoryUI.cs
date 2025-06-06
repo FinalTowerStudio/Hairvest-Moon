@@ -40,12 +40,7 @@ namespace HairvestMoon.UI
         {
             var bus = ServiceLocator.Get<GameEventBus>();
             bus.BackpackChanged += RefreshUI;
-        }
-
-        private void OnDisable()
-        {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged -= RefreshUI;
+            bus.ItemInstalled += OnItemInstalled;
         }
 
         private void BuildUI()
@@ -98,27 +93,7 @@ namespace HairvestMoon.UI
         {
             currentSelectedItem = selectedItem;
             UpdateSelection(selectedItem);
-
-            if (ServiceLocator.Get<BackpackEquipInstallManager>().TryEquip(selectedItem))
-            {
-                Debug.Log("Installed " + selectedItem.itemName);
-                RefreshEquipSlots();
-            }
         }
-
-        private void RefreshEquipSlots()
-        {
-            hoeToolSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().hoeTool);
-            wateringToolSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().wateringTool);
-            seedToolSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().seedTool);
-            harvestToolSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().harvestTool);
-
-            hoeUpgradeSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().hoeUpgrade);
-            wateringUpgradeSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().wateringUpgrade);
-            seedUpgradeSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().seedUpgrade);
-            harvestUpgradeSlot.SetSlot(ServiceLocator.Get<BackpackEquipSystem>().harvestUpgrade);
-        }
-
 
         private void UpdateSelection(ItemData selectedItem)
         {
@@ -129,6 +104,11 @@ namespace HairvestMoon.UI
                 itemDescriptionUI.SetItem(selectedItem);
             else
                 itemDescriptionUI.Clear();
+        }
+
+        private void OnItemInstalled(ItemInstalledEventArgs args)
+        {
+            RefreshUI();
         }
     }
 }

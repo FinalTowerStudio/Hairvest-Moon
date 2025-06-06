@@ -48,6 +48,9 @@ namespace HairvestMoon.Core
         public void RaiseControlModeChanged(ControlMode mode)
             => ControlModeChanged?.Invoke(new ControlModeChangedArgs(mode));
 
+        public event Action LookInputDetected;
+        public void RaiseLookInputDetected() => LookInputDetected?.Invoke();
+
         // Farming Tile Events
         public event Action<Vector3Int> TileTilled;
         public void RaiseTileTilled(Vector3Int pos) => TileTilled?.Invoke(pos);
@@ -59,6 +62,30 @@ namespace HairvestMoon.Core
         public void RaisePlayerFormChanged(PlayerForm newForm)
             => PlayerFormChanged?.Invoke(new PlayerFormChangedArgs(newForm));
 
+        // Inventory Install Event
+        public event Action<ItemInstalledEventArgs> ItemInstalled;
+
+        public void RaiseItemInstalled(ItemData item)
+        {
+            ItemInstalled?.Invoke(new ItemInstalledEventArgs(item));
+        }
+
+        public event Action GlobalSystemsInitialized;
+        public void RaiseGlobalSystemsInitialized()
+        {
+            GlobalSystemsInitialized?.Invoke();
+        }
+
+    }
+
+    public class ItemInstalledEventArgs
+    {
+        public ItemData InstalledItem { get; }
+
+        public ItemInstalledEventArgs(ItemData installedItem)
+        {
+            InstalledItem = installedItem;
+        }
     }
 
     // Argument Classes (Unity-safe, no 'init')

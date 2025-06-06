@@ -11,6 +11,7 @@ namespace HairvestMoon.Player
         [Header("Dependencies")]
         [SerializeField] private Rigidbody2D _rb;
 
+        private bool isInitialized = false;
         private bool _canMove = true;
         private Vector2 _moveDir = Vector2.zero;
 
@@ -25,15 +26,29 @@ namespace HairvestMoon.Player
         private readonly int _animeMoveUp = Animator.StringToHash("AN_Character_Farmer_Walk_Up");
         private readonly int _animeMoveDown = Animator.StringToHash("AN_Character_Farmer_Walk_Down");
 
+        public void Initialize()
+        {
+            isInitialized = true;
+        }
 
         public void RegisterBusListeners()
         {
             var bus = ServiceLocator.Get<GameEventBus>();
             bus.GameStateChanged += OnGameStateChanged;
+            bus.ControlModeChanged += OnControlModeChanged;
+            bus.LookInputDetected += OnLookInputDetected;
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
         }
 
         private void Update()
         {
+            if (!isInitialized) return;
+
             _moveDir = _canMove ? ServiceLocator.Get<InputController>().MoveInput : Vector2.zero;
 
             ServiceLocator.Get<PlayerFacingController>().UpdateFacing(
@@ -47,6 +62,8 @@ namespace HairvestMoon.Player
 
         private void FixedUpdate()
         {
+            if (!isInitialized) return;
+
             _rb.linearVelocity = _moveDir.normalized * MoveSpeed * Time.fixedDeltaTime;
         }
 
@@ -54,6 +71,16 @@ namespace HairvestMoon.Player
         {
             var newState = args.State;
             _canMove = newState == GameState.FreeRoam;
+        }
+
+        private void OnControlModeChanged(ControlModeChangedArgs args)
+        {
+            // You can add any debug logs or mode-based logic here if needed.
+        }
+
+        private void OnLookInputDetected()
+        {
+            // Optional: hook into facing or animation adjustments if you want additional behavior on look input.
         }
 
         private void UpdateAnimation(PlayerFacingController.FacingDirection facing)

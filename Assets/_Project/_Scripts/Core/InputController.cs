@@ -20,10 +20,6 @@ namespace HairvestMoon.Core
         public bool LookInputThisFrame { get; private set; }
 
         public ControlMode CurrentMode { get; private set; } = ControlMode.Mouse;
-        public event Action<ControlMode> OnControlModeChanged;
-        public event Action OnToolNext;
-        public event Action OnToolPrevious;
-        public event Action OnMenuToggle;
 
         private InputSystem_Actions _input;
 
@@ -33,16 +29,30 @@ namespace HairvestMoon.Core
 
         private bool _inputLocked = false;
 
-        public void InitInput()
+        private bool isInitialized = false;
+
+        // Your existing fields stay as-is
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            bus.InputLockChanged += OnInputLockChanged;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
+
+        public void Initialize()
         {
             _input = new InputSystem_Actions();
             _input.Player.SetCallbacks(this);
             _input.Player.Enable();
-
-
             _input.Player.Pause.performed += OnPause;
-
             playerInput.onControlsChanged += HandleControlsChanged;
+            isInitialized = true;
         }
 
         private void HandleControlsChanged(PlayerInput input)
@@ -58,9 +68,10 @@ namespace HairvestMoon.Core
             }
         }
 
-
         private void Update()
         {
+            if (!isInitialized) return;
+
             LookInputThisFrame = false;
 
             if (_inputLocked) return;
@@ -82,13 +93,14 @@ namespace HairvestMoon.Core
                 if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f)
                 {
                     LookInputThisFrame = true;
+                    ServiceLocator.Get<GameEventBus>().RaiseLookInputDetected();
                 }
             }
         }
 
-        public void HandleInputLock(bool locked)
+        private void OnInputLockChanged(InputLockChangedArgs args)
         {
-            _inputLocked = locked;
+            _inputLocked = args.Locked;
         }
 
         public void OnMove(InputAction.CallbackContext context)
@@ -108,7 +120,7 @@ namespace HairvestMoon.Core
                 {
                     Debug.Log("[InputController] Switching to Mouse due to movement.");
                     CurrentMode = ControlMode.Mouse;
-                    OnControlModeChanged?.Invoke(CurrentMode);
+                    ServiceLocator.Get<GameEventBus>().RaiseControlModeChanged(CurrentMode);
                 }
             }
         }
@@ -128,7 +140,7 @@ namespace HairvestMoon.Core
                 {
                     Debug.Log("[InputController] Switching to Controller due to movement.");
                     CurrentMode = ControlMode.Gamepad;
-                    OnControlModeChanged?.Invoke(CurrentMode);
+                    ServiceLocator.Get<GameEventBus>().RaiseControlModeChanged(CurrentMode);
                 }
             }
         }

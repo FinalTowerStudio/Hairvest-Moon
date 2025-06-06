@@ -1,9 +1,10 @@
 using UnityEngine;
 using HairvestMoon.Tool;
+using HairvestMoon.Core;
 
 namespace HairvestMoon.Inventory
 {
-    public class BackpackEquipSystem : MonoBehaviour
+    public class BackpackEquipSystem : MonoBehaviour, IBusListener
     {
         [Header("Tool Equip Slots")]
         public ItemData hoeTool;
@@ -16,6 +17,17 @@ namespace HairvestMoon.Inventory
         public ItemData wateringUpgrade;
         public ItemData seedUpgrade;
         public ItemData harvestUpgrade;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
+        public void Initialize() { }
 
         public void EquipTool(ItemData toolItem)
         {

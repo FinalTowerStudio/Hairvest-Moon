@@ -5,13 +5,27 @@ namespace HairvestMoon.Core
     // Enum-driven state machine (Gameplay, Dialogue, Pause, etc.)
     // Broadcasts changes via OnGameStateChanged
     // Used to lock input, pause systems, manage cutscenes or tasks
-    public class GameStateManager : MonoBehaviour
+    public class GameStateManager : MonoBehaviour, IBusListener
     {
         public GameState CurrentState { get; private set; }
 
         public bool IsInputLocked { get; private set; } = false;
 
-        public void InitializeGameState() { SetState(GameState.FreeRoam); }
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
+
+        public void Initialize()
+        {
+            SetState(GameState.FreeRoam);
+        }
 
         public void SetState(GameState newState)
         {

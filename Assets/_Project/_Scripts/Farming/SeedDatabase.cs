@@ -1,15 +1,27 @@
+using HairvestMoon.Core;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace HairvestMoon.Farming
 {
-    public class SeedDatabase : MonoBehaviour
+    public class SeedDatabase : MonoBehaviour, IBusListener
     {
         [SerializeField] private List<SeedData> allSeeds;
 
         private Dictionary<ItemData, SeedData> lookup = new();
 
         public List<SeedData> AllSeeds => allSeeds;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            InitializeSeedDatabase();
+        }
 
         public void InitializeSeedDatabase()
         {

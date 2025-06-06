@@ -20,12 +20,6 @@ namespace HairvestMoon.UI
             bus.BackpackChanged += Refresh;
         }
 
-        private void OnDisable()
-        {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged -= Refresh;
-        }
-
         private void Refresh()
         {
             int current = ServiceLocator.Get<BackpackInventorySystem>().GetAllSlots().Count;

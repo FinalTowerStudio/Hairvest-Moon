@@ -29,7 +29,7 @@ namespace HairvestMoon.Player
 
         public void InitializePlayerState()
         {
-            SwitchToForm(PlayerForm.Human);
+            CurrentForm = PlayerForm.Human;
         }
 
         public void EnterWerewolfForm() => SwitchToForm(PlayerForm.Werewolf);

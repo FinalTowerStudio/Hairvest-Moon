@@ -7,7 +7,7 @@ namespace HairvestMoon.Core
     // Notifies listeners every in-game minute
     // Provides GetFormattedTime() and IsNight() helpers
 
-    public class GameTimeManager : MonoBehaviour
+    public class GameTimeManager : MonoBehaviour, IBusListener
     {
         [Header("Time Settings")]
         [SerializeField] private float secondsPerGameMinute = 1f;
@@ -22,10 +22,22 @@ namespace HairvestMoon.Core
 
         private float _timer;
         private bool _isNight = false;
+        private bool isInitialized = false;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            isInitialized = true;
+        }
 
         private void Update()
         {
-            if (IsTimeFrozen) return;
+            if (!isInitialized || IsTimeFrozen) return;
 
             _timer += Time.deltaTime * TimeScale;
             if (_timer >= secondsPerGameMinute)

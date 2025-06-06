@@ -1,6 +1,9 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using HairvestMoon.UI;
+using HairvestMoon.Inventory;
+using HairvestMoon.Core;
 
 namespace HairvestMoon.UI
 {
@@ -13,6 +16,7 @@ namespace HairvestMoon.UI
 
         private ItemData item;
         private System.Action<ItemData> onClick;
+        private InstallConfirmUI installConfirmUI;
 
         public void Initialize(ItemData itemData, int quantity, System.Action<ItemData> clickCallback)
         {
@@ -23,8 +27,15 @@ namespace HairvestMoon.UI
             iconImage.color = Color.white;
             quantityText.text = quantity > 1 ? quantity.ToString() : "";
 
-            selectButton.onClick.AddListener(() => onClick?.Invoke(item));
+            selectButton.onClick.AddListener(OnClicked);
             SetSelected(false);
+
+            installConfirmUI = ServiceLocator.Get<InstallConfirmUI>();
+        }
+
+        private void OnClicked()
+        {
+            installConfirmUI.Show(item);
         }
 
         public void SetSelected(bool isSelected)

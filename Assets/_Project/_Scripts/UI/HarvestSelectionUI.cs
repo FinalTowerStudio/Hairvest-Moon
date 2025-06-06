@@ -15,9 +15,11 @@ namespace HairvestMoon.UI
 
         private List<UpgradeSelectionSlot> slots = new();
         private ItemData currentSelectedHarvestOption;
+        private CanvasGroup harvestSelectionCanvasGroup;
 
         public void InitializeUI()
         {
+            harvestSelectionCanvasGroup = GetComponent<CanvasGroup>();
             BuildUI();
         }
 
@@ -27,21 +29,20 @@ namespace HairvestMoon.UI
             bus.BackpackChanged += RefreshUI;
         }
 
-        private void OnDisable()
-        {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged -= RefreshUI;
-        }
-
         public void OpenHarvestMenu()
         {
             gameObject.SetActive(true);
             BuildUI();
+            harvestSelectionCanvasGroup.alpha = 1f;
+            harvestSelectionCanvasGroup.interactable = true;
+            harvestSelectionCanvasGroup.blocksRaycasts = true;
         }
 
         public void CloseHarvestMenu()
         {
-            gameObject.SetActive(false);
+            harvestSelectionCanvasGroup.alpha = 0f;
+            harvestSelectionCanvasGroup.interactable = false;
+            harvestSelectionCanvasGroup.blocksRaycasts = false;
         }
 
         private void BuildUI()

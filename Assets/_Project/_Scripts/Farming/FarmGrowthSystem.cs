@@ -9,26 +9,41 @@ namespace HairvestMoon.Farming
     /// </summary>
     public class FarmGrowthSystem : MonoBehaviour, IBusListener
     {
+        private bool isInitialized = false;
+
         public void RegisterBusListeners()
         {
             var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
             bus.TimeChanged += OnMinuteGrowthTick;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            isInitialized = true;
         }
 
         private void OnMinuteGrowthTick(TimeChangedArgs args)
         {
-            var hour = args.Hour;
-            var minute = args.Minute;
+            if (!isInitialized) return;
 
             foreach (var entry in ServiceLocator.Get<FarmTileDataManager>().AllTileData)
             {
+                var pos = entry.Key;
                 var data = entry.Value;
-                if (!data.isTilled || data.plantedCrop == null || !data.isWatered)
-                    continue;
 
-                data.wateredMinutesAccumulated += 1f;
+                if (data.plantedCrop != null)
+                {
+                    data.wateredMinutesAccumulated += 1;
+
+                    if (data.wateredMinutesAccumulated >= data.plantedCrop.growthDurationMinutes)
+                    {
+                        data.wateredMinutesAccumulated = data.plantedCrop.growthDurationMinutes;
+                    }
+                }
             }
         }
+
     }
 
 }

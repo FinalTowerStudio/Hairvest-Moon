@@ -37,7 +37,7 @@ namespace HairvestMoon.Inventory
 
                 if (itemData.itemType == ItemType.Seed || itemData.itemType == ItemType.Crop)
                 {
-                    added = ServiceLocator.Get<InventorySystem>().AddItem(itemData, quantity);
+                    added = ServiceLocator.Get<ResourceInventorySystem>().AddItem(itemData, quantity);
                 }
                 else
                 {

@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace HairvestMoon.Inventory
 {
-    public class BackpackUpgradeManager : MonoBehaviour
+    public class BackpackUpgradeManager : MonoBehaviour, IBusListener
     {
         [Header("Upgrade Settings")]
         [SerializeField] private int baseSlots = 10;
@@ -14,6 +14,17 @@ namespace HairvestMoon.Inventory
         public int BaseSlots => baseSlots;
 
         private int upgradeLevel = 0;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
 
         public void Initialize()
         {

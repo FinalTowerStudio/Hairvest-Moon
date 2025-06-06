@@ -15,11 +15,11 @@ namespace HairvestMoon.UI
 
         private List<UpgradeSelectionSlot> slots = new();
         private ItemData currentSelectedWatering;
+        private CanvasGroup wateringSelectionCanvasGroup;
 
         public void InitializeUI()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged += RefreshUI;
+            wateringSelectionCanvasGroup = GetComponent<CanvasGroup>();
             BuildUI();
         }
 
@@ -29,21 +29,20 @@ namespace HairvestMoon.UI
             bus.BackpackChanged += RefreshUI;
         }
 
-        private void OnDisable()
-        {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged -= RefreshUI;
-        }
-
         public void OpenWateringMenu()
         {
             gameObject.SetActive(true);
             BuildUI();
+            wateringSelectionCanvasGroup.alpha = 1f;
+            wateringSelectionCanvasGroup.interactable = true;
+            wateringSelectionCanvasGroup.blocksRaycasts = true;
         }
 
         public void CloseWateringMenu()
         {
-            gameObject.SetActive(false);
+            wateringSelectionCanvasGroup.alpha = 0f;
+            wateringSelectionCanvasGroup.interactable = false;
+            wateringSelectionCanvasGroup.blocksRaycasts = false;
         }
 
         private void BuildUI()

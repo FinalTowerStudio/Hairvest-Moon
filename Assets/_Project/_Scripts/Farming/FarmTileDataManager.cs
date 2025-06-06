@@ -1,4 +1,5 @@
 using HairvestMoon.Core;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -9,7 +10,7 @@ namespace HairvestMoon.Farming
     /// Stores logical gameplay state for each farm tile. Tracks tilling, watering, and crop growth.
     /// Interfaces with tilemaps and farming tools to apply gameplay effects.
     /// </summary>
-    public class FarmTileDataManager : MonoBehaviour
+    public class FarmTileDataManager : MonoBehaviour, IBusListener
     {
         private Dictionary<Vector3Int, FarmTileData> _tileDataMap = new();
 
@@ -28,6 +29,19 @@ namespace HairvestMoon.Farming
         public Dictionary<Vector3Int, FarmTileData> AllTileData => _tileDataMap;
 
         public const float HoursPerWatering = 12f;
+
+        public void RegisterBusListeners()
+        {
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
+
+        private void Initialize(){}
 
         public bool IsTileTillable(Vector3Int pos)
         {
