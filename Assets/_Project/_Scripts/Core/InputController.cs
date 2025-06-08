@@ -9,7 +9,7 @@ namespace HairvestMoon.Core
     /// </summary>
     public enum ControlMode { Mouse, Gamepad }
 
-    public class InputController : MonoBehaviour, InputSystem_Actions.IPlayerActions
+    public class InputController : MonoBehaviour, InputSystem_Actions.IPlayerActions, IBusListener
     {
         [SerializeField] private PlayerInput playerInput;
 
@@ -30,14 +30,13 @@ namespace HairvestMoon.Core
         private bool _inputLocked = false;
 
         private bool isInitialized = false;
-
-        // Your existing fields stay as-is
+        private GameEventBus _eventBus;
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
-            bus.InputLockChanged += OnInputLockChanged;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus.InputLockChanged += OnInputLockChanged;
         }
 
         private void OnGlobalSystemsInitialized()
@@ -64,7 +63,7 @@ namespace HairvestMoon.Core
             {
                 Debug.Log($"[InputController] Switched control scheme: {scheme} → {newMode}");
                 CurrentMode = newMode;
-                ServiceLocator.Get<GameEventBus>().RaiseControlModeChanged(CurrentMode);
+                _eventBus.RaiseControlModeChanged(CurrentMode);
             }
         }
 
@@ -93,7 +92,7 @@ namespace HairvestMoon.Core
                 if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f)
                 {
                     LookInputThisFrame = true;
-                    ServiceLocator.Get<GameEventBus>().RaiseLookInputDetected();
+                    _eventBus.RaiseLookInputDetected();
                 }
             }
         }
@@ -120,7 +119,7 @@ namespace HairvestMoon.Core
                 {
                     Debug.Log("[InputController] Switching to Mouse due to movement.");
                     CurrentMode = ControlMode.Mouse;
-                    ServiceLocator.Get<GameEventBus>().RaiseControlModeChanged(CurrentMode);
+                    _eventBus.RaiseControlModeChanged(CurrentMode);
                 }
             }
         }
@@ -140,7 +139,7 @@ namespace HairvestMoon.Core
                 {
                     Debug.Log("[InputController] Switching to Controller due to movement.");
                     CurrentMode = ControlMode.Gamepad;
-                    ServiceLocator.Get<GameEventBus>().RaiseControlModeChanged(CurrentMode);
+                    _eventBus.RaiseControlModeChanged(CurrentMode);
                 }
             }
         }
@@ -152,20 +151,20 @@ namespace HairvestMoon.Core
         public void OnNext(InputAction.CallbackContext context)
         {
             if (context.performed && !_inputLocked)
-                ServiceLocator.Get<GameEventBus>().RaiseToolNext();
+                _eventBus.RaiseToolNext();
         }
 
         public void OnPrevious(InputAction.CallbackContext context)
         {
             if (context.performed && !_inputLocked)
-                ServiceLocator.Get<GameEventBus>().RaiseToolPrevious();
+                _eventBus.RaiseToolPrevious();
         }
 
         public void OnSprint(InputAction.CallbackContext context) { }
         public void OnPause(InputAction.CallbackContext context)
         {
             if (context.performed)
-                ServiceLocator.Get<GameEventBus>().RaiseMenuToggle();
+                _eventBus.RaiseMenuToggle();
         }
 
     }

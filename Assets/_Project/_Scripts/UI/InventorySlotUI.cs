@@ -1,46 +1,62 @@
-﻿using HairvestMoon.Core;
-using HairvestMoon.Inventory;
-using HairvestMoon.UI;
-using HairvestMoon;
-using TMPro;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
+using HairvestMoon.Inventory;
+using HairvestMoon.Core;
 
-public class InventorySlotUI : MonoBehaviour
+namespace HairvestMoon.UI
 {
-    [SerializeField] private Image iconImage;
-    [SerializeField] private TextMeshProUGUI nameText;
-    [SerializeField] private TextMeshProUGUI quantityText;
-
-    private ItemData item;
-    private InstallConfirmUI installConfirmUI;
-
-    private void Start()
+    /// <summary>
+    /// UI slot for resource inventory (seeds, crops, materials).
+    /// Displays icon, quantity, and optional selection.
+    /// </summary>
+    public class InventorySlotUI : MonoBehaviour
     {
-        installConfirmUI = ServiceLocator.Get<InstallConfirmUI>();
-    }
+        [Header("UI References")]
+        [SerializeField] private Image iconImage;
+        [SerializeField] private Text quantityText;
+        [SerializeField] private GameObject highlightObj;
+        [SerializeField] private Button button;
 
-    public void Initialize(ItemData itemData)
-    {
-        item = itemData;
-    }
+        public ItemData Item { get; private set; }
 
-    public void UpdateDisplay()
-    {
-        bool discovered = ServiceLocator.Get<ResourceInventorySystem>().discoveredItems.Contains(item);
-        iconImage.sprite = discovered ? item.itemIcon : null;
-        iconImage.color = discovered ? Color.white : Color.gray;
-        nameText.text = discovered ? item.itemName : "????";
-
-        int quantity = ServiceLocator.Get<ResourceInventorySystem>().GetQuantity(item);
-        quantityText.text = discovered ? quantity.ToString() : "";
-    }
-
-    public void OnClick()
-    {
-        if (item.itemType == ItemType.Tool || item.itemType == ItemType.Upgrade)
+        /// <summary>
+        /// Initialize the slot with item and optional selection callback.
+        /// </summary>
+        public void Initialize(ItemData item, System.Action<ItemData> onSelected = null)
         {
-            installConfirmUI.Show(item);
+            Item = item;
+            iconImage.sprite = item ? item.itemIcon : null;
+            highlightObj.SetActive(false);
+
+            button.onClick.RemoveAllListeners();
+            if (onSelected != null)
+                button.onClick.AddListener(() => onSelected(Item));
+        }
+
+        /// <summary>
+        /// Sets the quantity text.
+        /// </summary>
+        public void UpdateDisplay()
+        {
+            int qty = 0;
+            if (Item != null)
+                qty = ServiceLocator.Get<ResourceInventorySystem>().GetQuantity(Item);
+            quantityText.text = qty > 1 ? qty.ToString() : "";
+        }
+
+        public void SetSelected(bool selected)
+        {
+            highlightObj.SetActive(selected);
+        }
+
+        public void OnPointerEnter()
+        {
+            if (Item != null)
+                SelectionTooltipUI.Show(Item);
+        }
+        public void OnPointerExit()
+        {
+            SelectionTooltipUI.Hide();
         }
     }
 }

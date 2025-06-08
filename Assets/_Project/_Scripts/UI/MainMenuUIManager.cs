@@ -76,7 +76,7 @@ namespace HairvestMoon.UI
                 inventoryPanel.GetComponent<BackpackInventoryUI>().RefreshUI();
 
             if (currentTabIndex == 1)
-                cropLogPanel.GetComponent<InventoryOverviewUI>().RefreshUI();
+                cropLogPanel.GetComponent<ResourceInventoryUI>().RefreshUI();
         }
 
 

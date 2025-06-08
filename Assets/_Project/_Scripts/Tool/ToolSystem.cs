@@ -4,72 +4,118 @@ using HairvestMoon.Farming;
 using HairvestMoon.UI;
 using HairvestMoon.Core;
 
-
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
-
 namespace HairvestMoon.Tool
 {
     /// <summary>
-    /// Core tool system management: handles current tool state and tool capacity.
+    /// Core tool system: holds the current active tool, manages watering can state,
+    /// notifies selection UIs, and provides feedback.
     /// </summary>
-    public partial class ToolSystem : MonoBehaviour
+    public partial class ToolSystem : MonoBehaviour, IBusListener
     {
         [Header("Watering Can Settings")]
         public float waterCanCapacity = 100f;
+        public float maxWaterCapacity = 100f;
         public float waterPerUse = 1f;
 
         public ToolType CurrentTool { get; private set; } = ToolType.None;
 
+        private static GameEventBus _eventBus;
+        private static SeedSelectionUI _seedUI;
+        private static WateringSelectionUI _wateringUI;
+        private static HoeSelectionUI _hoeUI;
+        private static HarvestSelectionUI _harvestUI;
+        private static DebugUIOverlay _debugUI;
+
+        public void RegisterBusListeners()
+        {
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
+
+        /// <summary>
+        /// Sets up UI and EventBus references for efficiency and safety.
+        /// </summary>
+        public void Initialize()
+        {
+            _seedUI = ServiceLocator.Get<SeedSelectionUI>();
+            _wateringUI = ServiceLocator.Get<WateringSelectionUI>();
+            _hoeUI = ServiceLocator.Get<HoeSelectionUI>();
+            _harvestUI = ServiceLocator.Get<HarvestSelectionUI>();
+            _debugUI = ServiceLocator.Get<DebugUIOverlay>();
+        }
+
+        /// <summary>
+        /// Set the currently active tool, notify UIs, fire change events.
+        /// </summary>
         public void SetTool(ToolType tool)
         {
             CurrentTool = tool;
-            ServiceLocator.Get<DebugUIOverlay>().ShowLastAction($"Tool: {CurrentTool}");
+            _debugUI?.ShowLastAction($"Tool: {CurrentTool}");
 
             // Close all selection UIs first
-            ServiceLocator.Get<SeedSelectionUI>()?.CloseSeedMenu();
-            ServiceLocator.Get<WateringSelectionUI>()?.CloseWateringMenu();
-            ServiceLocator.Get<HoeSelectionUI>()?.CloseHoeMenu();
-            ServiceLocator.Get<HarvestSelectionUI>()?.CloseHarvestMenu();
+            _seedUI?.CloseSeedMenu();
+            _wateringUI?.CloseWateringMenu();
+            _hoeUI?.CloseHoeMenu();
+            _harvestUI?.CloseHarvestMenu();
 
             // Open only the active tool's selection UI
             switch (tool)
             {
                 case ToolType.Seed:
-                    ServiceLocator.Get<SeedSelectionUI>().OpenSeedMenu();
+                    _seedUI?.OpenSeedMenu();
                     break;
                 case ToolType.WateringCan:
-                    ServiceLocator.Get<WateringSelectionUI>().OpenWateringMenu();
+                    _wateringUI?.OpenWateringMenu();
                     break;
                 case ToolType.Hoe:
-                    ServiceLocator.Get<HoeSelectionUI>().OpenHoeMenu();
+                    _hoeUI?.OpenHoeMenu();
                     break;
                 case ToolType.Harvest:
-                    ServiceLocator.Get<HarvestSelectionUI>().OpenHarvestMenu();
+                    _harvestUI?.OpenHarvestMenu();
                     break;
             }
+
+            // Broadcast event bus ToolChanged for all listeners
+            _eventBus?.RaiseToolChanged(tool);
         }
 
-
+        /// <summary>
+        /// Consume water from the can when used. Enforces min/max.
+        /// </summary>
         public void ConsumeWaterFromCan()
         {
             waterCanCapacity -= waterPerUse;
-            waterCanCapacity = Mathf.Max(0f, waterCanCapacity);
-            ServiceLocator.Get<DebugUIOverlay>().ShowLastAction($"Water Remaining: {waterCanCapacity}");
+            waterCanCapacity = Mathf.Clamp(waterCanCapacity, 0f, maxWaterCapacity);
+            _debugUI.ShowLastAction($"Water Remaining: {waterCanCapacity}");
+            // TODO: Play "water used" sound, check for empty state
         }
 
+        /// <summary>
+        /// Refill can by amount, up to max capacity.
+        /// </summary>
         public void RefillWaterCan(float refillAmount)
         {
             waterCanCapacity += refillAmount;
-            // Optional: Clamp to some max value if you want limits
+            waterCanCapacity = Mathf.Clamp(waterCanCapacity, 0f, maxWaterCapacity);
+            // TODO: Play refill sound, feedback
         }
 
+        /// <summary>
+        /// Fully refill water can.
+        /// </summary>
         public void RefillWaterToFull()
         {
-            waterCanCapacity = 100f;  // we need to make this a constant or configurable value, consider modifications to max capacity later.
+            waterCanCapacity = maxWaterCapacity;
+            // TODO: Play full refill effect
         }
 
 

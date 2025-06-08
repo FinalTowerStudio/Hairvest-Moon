@@ -1,61 +1,78 @@
 using HairvestMoon.Core;
-using System.Collections.Generic;
 using UnityEngine;
 
 namespace HairvestMoon.Player
 {
-    [System.Serializable]
-    public class PlayerFormData
+    public class PlayerStateController : MonoBehaviour, IBusListener
     {
-        public PlayerStateController.PlayerForm FormType;
-        public GameObject VisualRoot;
-        public Animator Animator;
-        public SpriteRenderer Renderer;
-        public float MoveSpeed;
-    }
+        [System.Serializable]
+        public class PlayerFormData
+        {
+            public PlayerForm FormType;
+            public GameObject VisualRoot;
+            public Animator Animator;
+            public SpriteRenderer Renderer;
+            public float MoveSpeed;
+        }
 
-    // Singleton
-    // Manages visual GameObjects, animators, and movement stats per form
-    // Provides clean access to form-specific data like Animator and speed
-
-    public class PlayerStateController : MonoBehaviour
-    {
         public enum PlayerForm { Human, Werewolf }
         public PlayerForm CurrentForm { get; private set; }
 
-        [SerializeField] private List<PlayerFormData> formDataList;
+        [Header("Player Forms")]
+        [SerializeField] private PlayerFormData[] formDataList;
 
         private PlayerFormData _currentFormData;
-
-        public void InitializePlayerState()
-        {
-            CurrentForm = PlayerForm.Human;
-        }
-
-        public void EnterWerewolfForm() => SwitchToForm(PlayerForm.Werewolf);
-        public void ExitWerewolfForm() => SwitchToForm(PlayerForm.Human);
-
-        private void SwitchToForm(PlayerForm newForm)
-        {
-            foreach (var form in formDataList)
-            {
-                bool isActive = form.FormType == newForm;
-                form.VisualRoot.SetActive(isActive);
-                if (isActive)
-                {
-                    _currentFormData = form;
-                    CurrentForm = newForm;
-
-                    ServiceLocator.Get<GameEventBus>().RaisePlayerFormChanged(CurrentForm);
-                }
-            }
-        }
-
+        private GameEventBus _eventBus;
 
         public Animator CurrentAnimator => _currentFormData.Animator;
         public SpriteRenderer CurrentSpriteRenderer => _currentFormData.Renderer;
         public float MoveSpeed => _currentFormData.MoveSpeed;
-        public bool IsWerewolf() => CurrentForm == PlayerForm.Werewolf;
-    }
+        public bool IsFormInitialized { get; private set; } = false;
 
+        public void RegisterBusListeners()
+        {
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+        }
+
+        public void Initialize()
+        {
+            SwitchToFormInternal(PlayerForm.Human);
+            IsFormInitialized = true;
+        }
+
+        public bool RequestPlayerForm(PlayerForm newForm)
+        {
+            if (CurrentForm == newForm) return false;
+
+            if (!CanChangeForm(newForm))
+                return false; // Block for quest, item, or cooldown
+
+            SwitchToFormInternal(newForm);
+            return true;
+        }
+
+        private bool CanChangeForm(PlayerForm requestedForm)
+        {
+            // Insert any checks here (e.g., only during night, after X seconds, if holding a special item, etc.)
+            return true;
+        }
+
+        private void SwitchToFormInternal(PlayerForm newForm)
+        {
+            foreach (var form in formDataList)
+                form.VisualRoot.SetActive(false);
+
+            CurrentForm = newForm;
+            _currentFormData = System.Array.Find(formDataList, f => f.FormType == CurrentForm);
+            _currentFormData?.VisualRoot.SetActive(true);
+
+            _eventBus.RaisePlayerFormChanged(CurrentForm);
+        }
+    }
 }

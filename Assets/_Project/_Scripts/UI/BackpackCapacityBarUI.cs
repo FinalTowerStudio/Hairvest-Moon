@@ -5,12 +5,20 @@ using UnityEngine.UI;
 
 namespace HairvestMoon.UI
 {
+    /// <summary>
+    /// Shows fill bar for backpack capacity, updates on inventory change.
+    /// </summary>
     public class BackpackCapacityBarUI : MonoBehaviour, IBusListener
     {
         [SerializeField] private Image fillImage;
 
+        private BackpackInventorySystem _backpackInventory;
+        private BackpackUpgradeManager _upgradeManager;
+
         public void InitializeUI()
         {
+            _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
+            _upgradeManager = ServiceLocator.Get<BackpackUpgradeManager>();
             Refresh();
         }
 
@@ -22,10 +30,9 @@ namespace HairvestMoon.UI
 
         private void Refresh()
         {
-            int current = ServiceLocator.Get<BackpackInventorySystem>().GetAllSlots().Count;
-            int total = ServiceLocator.Get<BackpackUpgradeManager>().GetCurrentSlots();
-
-            float fillAmount = (float)current / total;
+            int current = _backpackInventory?.Slots.Count ?? 0;
+            int total = _upgradeManager?.GetCurrentSlots() ?? 1;
+            float fillAmount = (total > 0) ? (float)current / total : 0f;
             fillImage.fillAmount = fillAmount;
         }
     }

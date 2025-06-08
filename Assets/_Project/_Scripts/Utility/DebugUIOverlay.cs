@@ -10,7 +10,7 @@ namespace HairvestMoon.Utility
     // UI script for debugging: shows time, day, current form, and game state
     // Automatically updates from GameTimeManager, GameStateManager, PlayerStateController
 
-    public class DebugUIOverlay : MonoBehaviour
+    public class DebugUIOverlay : MonoBehaviour, IBusListener
     {
         [SerializeField] private TextMeshProUGUI timeText;
         [SerializeField] private TextMeshProUGUI dayText;

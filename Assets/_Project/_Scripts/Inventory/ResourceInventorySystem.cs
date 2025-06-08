@@ -1,142 +1,105 @@
-﻿using HairvestMoon.Inventory;
-using HairvestMoon;
+﻿using HairvestMoon.Core;
+using HairvestMoon.Inventory;
 using System.Collections.Generic;
-using UnityEngine;
-using System;
-using HairvestMoon.Farming;
-using HairvestMoon.Core;
 
 namespace HairvestMoon.Inventory
 {
     /// <summary>
-    /// Manages the player's inventory, including adding items, tracking discovered items, and querying item quantities.
+    /// Global resource inventory for crops, seeds, materials, etc.
+    /// Tracks discovered items for encyclopedia/unlock purposes.
+    /// Fires events on add, remove, and discover.
     /// </summary>
-    public class ResourceInventorySystem : MonoBehaviour, IBusListener
+    public class ResourceInventorySystem : IBusListener
     {
-        [System.Serializable]
-        public class InventorySlot
-        {
-            public ItemData item;
-            public int quantity;
-        }
+        private readonly Dictionary<ItemData, int> _inventory = new();
+        private readonly HashSet<ItemData> _discoveredItems = new();
 
-        [Header("Inventory Settings")]
-        public List<InventorySlot> inventory = new();
-        public HashSet<ItemData> discoveredItems = new HashSet<ItemData>();
+        public IReadOnlyDictionary<ItemData, int> Inventory => _inventory;
+        public IReadOnlyCollection<ItemData> DiscoveredItems => _discoveredItems;
+
+        private bool _isInitialized = false;
+        private GameEventBus _eventBus;
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
         {
             Initialize();
+            _isInitialized = true;
         }
 
-        public void Initialize() { }
-
-        public void MarkDiscovered(ItemData item)
+        /// <summary>
+        /// Clears inventory and discoveries (new game/start).
+        /// </summary>
+        public void Initialize()
         {
-            if (!discoveredItems.Contains(item))
-            {
-                discoveredItems.Add(item);
-                Debug.Log($"Discovered new item: {item.itemID}");
-            }
+            _inventory.Clear();
+            _discoveredItems.Clear();
         }
 
-        public bool AddItem(ItemData newItem, int amount = 1)
+        /// <summary>
+        /// Add an item and fire InventoryChanged. Returns true if successful.
+        /// </summary>
+        public bool AddItem(ItemData item, int quantity)
         {
-            // Unlimited stacking for Seeds and Crops
-            foreach (var slot in inventory)
-            {
-                if (slot.item == newItem)
-                {
-                    slot.quantity += amount;
-                    NotifyInventoryChanged();
-                    return true;
-                }
-            }
+            if (item == null || quantity <= 0) return false;
 
-            var newSlot = new InventorySlot { item = newItem, quantity = amount };
-            inventory.Add(newSlot);
-            MarkDiscovered(newItem);
-            NotifyInventoryChanged();
+            _inventory.TryGetValue(item, out int currentQty);
+            _inventory[item] = currentQty + quantity;
+
+            MarkDiscovered(item);
+            _eventBus.RaiseInventoryChanged();
+            // TODO: Optionally fire "ItemAdded" with item/quantity for UI.
             return true;
         }
 
-        public int GetQuantity(ItemData queryItem)
+        /// <summary>
+        /// Remove an item and fire InventoryChanged. Returns true if successful.
+        /// </summary>
+        public bool RemoveItem(ItemData item, int quantity)
         {
-            foreach (var slot in inventory)
-            {
-                if (slot.item == queryItem)
-                    return slot.quantity;
-            }
-            return 0;
+            if (item == null || quantity <= 0) return false;
+            if (!_inventory.TryGetValue(item, out int currentQty) || currentQty < quantity)
+                return false;
+
+            _inventory[item] -= quantity;
+            if (_inventory[item] <= 0)
+                _inventory.Remove(item);
+
+            _eventBus.RaiseInventoryChanged();
+            // TODO: Optionally fire "ItemRemoved" with item/quantity for UI.
+            return true;
         }
 
-        public bool RemoveItem(ItemData item, int amount)
+        /// <summary>
+        /// Get quantity of an item (0 if missing).
+        /// </summary>
+        public int GetQuantity(ItemData item)
         {
-            foreach (var slot in inventory)
-            {
-                if (slot.item == item)
-                {
-                    if (slot.quantity < amount)
-                        return false;
-
-                    slot.quantity -= amount;
-                    if (slot.quantity <= 0)
-                        inventory.Remove(slot);
-
-                    NotifyInventoryChanged();
-                    return true;
-                }
-            }
-            return false;
+            _inventory.TryGetValue(item, out int quantity);
+            return quantity;
         }
 
-        public List<ItemData> GetOwnedItemsByType(ItemType type)
+        /// <summary>
+        /// Mark an item as discovered (for encyclopedia/progression).
+        /// Fires event if first discovered.
+        /// </summary>
+        public void MarkDiscovered(ItemData item)
         {
-            List<ItemData> result = new();
+            if (item == null || _discoveredItems.Contains(item)) return;
 
-            foreach (var slot in inventory)
-            {
-                if (slot.item.itemType == type)
-                {
-                    result.Add(slot.item);
-                }
-            }
-            return result;
+            _discoveredItems.Add(item);
+            _eventBus.RaiseInventoryChanged();
+            // TODO: Fire a special "ItemDiscovered" event if desired.
         }
 
-        public List<ItemData> GetDiscoveredItemsByType(ItemType type)
-        {
-            List<ItemData> result = new();
-
-            foreach (var item in discoveredItems)
-            {
-                if (item.itemType == type)
-                {
-                    result.Add(item);
-                }
-            }
-            return result;
-        }
-
-        public List<InventorySlot> GetAllSlots()
-        {
-            return inventory;
-        }
-
-        public void ForceRefresh()
-        {
-            NotifyInventoryChanged();
-        }
-
-        private void NotifyInventoryChanged()
-        {
-            ServiceLocator.Get<GameEventBus>().RaiseInventoryChanged();
-        }
+        /// <summary>
+        /// Has this item ever been discovered?
+        /// </summary>
+        public bool IsDiscovered(ItemData item) => _discoveredItems.Contains(item);
     }
 }

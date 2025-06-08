@@ -5,12 +5,16 @@ using UnityEngine.Tilemaps;
 namespace HairvestMoon.Farming
 {
     /// <summary>
-    /// Handles rendering crop sprites based on growth stages after growth tick occurs.
+    /// Updates the visuals of all crops on the farm grid as crops grow.
     /// </summary>
     public class CropVisualSystem : MonoBehaviour, IBusListener
     {
-        private Tilemap cropTilemap;
+        [SerializeField] private Tilemap cropTilemap;
+        [SerializeField] private GameObject cropReadyParticlePrefab;
+        [SerializeField] private GameObject readyHighlightPrefab; //using prefab right now for simple overlay or particle effect
+
         private bool isInitialized = false;
+        private FarmTileDataManager _farmTileDataManager;
 
         public void RegisterBusListeners()
         {
@@ -21,17 +25,24 @@ namespace HairvestMoon.Farming
 
         private void OnGlobalSystemsInitialized()
         {
-            Initialize();
+            _farmTileDataManager = ServiceLocator.Get<FarmTileDataManager>();
             isInitialized = true;
-        }
-
-        public void Initialize()
-        {
-            cropTilemap = ServiceLocator.Get<FarmTileDataManager>().CropTilemap;
             RefreshAllCrops();
         }
 
-        private void OnRefreshCropVisuals(TimeChangedArgs args)
+        public void TriggerCropCompletedVFX(Vector3Int pos)
+        {
+            // Place a particle at the crop's tile
+            Vector3 worldPos = cropTilemap.CellToWorld(pos) + new Vector3(0.5f, 0.5f, 0f);
+            if (cropReadyParticlePrefab != null)
+                Instantiate(cropReadyParticlePrefab, worldPos, Quaternion.identity);
+
+            // Optional: place highlight overlay
+            if (readyHighlightPrefab != null)
+                Instantiate(readyHighlightPrefab, worldPos, Quaternion.identity, cropTilemap.transform);
+        }
+
+        private void OnRefreshCropVisuals(GameTimeChangedArgs args)
         {
             if (!isInitialized) return;
             RefreshAllCrops();
@@ -39,7 +50,7 @@ namespace HairvestMoon.Farming
 
         private void RefreshAllCrops()
         {
-            foreach (var entry in ServiceLocator.Get<FarmTileDataManager>().AllTileData)
+            foreach (var entry in _farmTileDataManager.AllTileData)
             {
                 var pos = entry.Key;
                 var data = entry.Value;
@@ -47,18 +58,40 @@ namespace HairvestMoon.Farming
                 if (data.plantedCrop == null)
                 {
                     cropTilemap.SetTile(pos, null);
+                    // Optionally remove highlight/particle here if we pool them
                     continue;
                 }
 
+                var growthStages = data.plantedCrop.growthStages;
+                if (growthStages == null || growthStages.Length == 0)
+                {
+                    cropTilemap.SetTile(pos, null);
+                    continue;
+                }
+
+                // If future withered
+                // if (data.isWithered && data.plantedCrop.witheredSprite != null)
+                // {
+                //     // set to withered tile
+                //     continue;
+                // }
+
                 float growthPercent = data.GetGrowthProgressPercent();
                 int stage = Mathf.Clamp(
-                    (int)(growthPercent * data.plantedCrop.growthStages.Length),
-                    0, data.plantedCrop.growthStages.Length - 1
+                    Mathf.FloorToInt(growthPercent * growthStages.Length),
+                    0, growthStages.Length - 1
                 );
 
                 Tile tile = ScriptableObject.CreateInstance<Tile>();
-                tile.sprite = data.plantedCrop.growthStages[stage];
+                tile.sprite = growthStages[stage];
                 cropTilemap.SetTile(pos, tile);
+
+                // Add highlight if crop is fully grown
+                if (data.HasRipeCrop() && readyHighlightPrefab != null)
+                {
+                    Vector3 worldPos = cropTilemap.CellToWorld(pos) + new Vector3(0.5f, 0.5f, 0f);
+                    Instantiate(readyHighlightPrefab, worldPos, Quaternion.identity, cropTilemap.transform);
+                }
             }
         }
     }

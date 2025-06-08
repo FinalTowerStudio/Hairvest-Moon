@@ -1,4 +1,5 @@
 using HairvestMoon.Player;
+using HairvestMoon.Tool;
 using System;
 using UnityEngine;
 using static HairvestMoon.Player.PlayerStateController;
@@ -15,15 +16,18 @@ namespace HairvestMoon.Core
         public void RaiseBackpackChanged() => BackpackChanged?.Invoke();
 
         // Time Events
-        public event Action<TimeChangedArgs> TimeChanged;
-        public void RaiseTimeChanged(int hour, int minute)
-            => TimeChanged?.Invoke(new TimeChangedArgs(hour, minute));
+        public event Action<GameTimeChangedArgs> TimeChanged;
+        public void RaiseTimeChanged(GameTimeChangedArgs args)
+            => TimeChanged?.Invoke(args);
 
         public event Action OnDawn;
         public void RaiseDawn() => OnDawn?.Invoke();
 
         public event Action OnDusk;
         public void RaiseDusk() => OnDusk?.Invoke();
+
+        public event Action OnNewDay;
+        public void RaiseNewDay() => OnNewDay?.Invoke();
 
         // Game State Events
         public event Action<GameStateChangedArgs> GameStateChanged;
@@ -76,6 +80,9 @@ namespace HairvestMoon.Core
             GlobalSystemsInitialized?.Invoke();
         }
 
+        public event Action<ToolType> ToolChanged;
+        public void RaiseToolChanged(ToolType tool) => ToolChanged?.Invoke(tool);
+
     }
 
     public class ItemInstalledEventArgs
@@ -85,18 +92,6 @@ namespace HairvestMoon.Core
         public ItemInstalledEventArgs(ItemData installedItem)
         {
             InstalledItem = installedItem;
-        }
-    }
-
-    // Argument Classes (Unity-safe, no 'init')
-    public class TimeChangedArgs
-    {
-        public int Hour { get; set; }
-        public int Minute { get; set; }
-        public TimeChangedArgs(int hour, int minute)
-        {
-            Hour = hour;
-            Minute = minute;
         }
     }
 
@@ -136,4 +131,17 @@ namespace HairvestMoon.Core
         }
     }
 
+    public class GameTimeChangedArgs
+    {
+        public int Hour { get; }
+        public int Minute { get; }
+        public int Day { get; }
+
+        public GameTimeChangedArgs(int hour, int minute, int day)
+        {
+            Hour = hour;
+            Minute = minute;
+            Day = day;
+        }
+    }
 }

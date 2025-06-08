@@ -1,46 +1,63 @@
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using HairvestMoon.UI;
 using HairvestMoon.Inventory;
-using HairvestMoon.Core;
 
 namespace HairvestMoon.UI
 {
+    /// <summary>
+    /// A UI slot for a backpack inventory item.
+    /// Shows icon, stack count, highlight, and selection.
+    /// </summary>
     public class BackpackSlotUI : MonoBehaviour
     {
+        [Header("UI References")]
         [SerializeField] private Image iconImage;
-        [SerializeField] private TextMeshProUGUI quantityText;
-        [SerializeField] private Image highlightImage;
-        [SerializeField] private Button selectButton;
+        [SerializeField] private Text stackText;
+        [SerializeField] private GameObject highlightObj;
+        [SerializeField] private Button button;
 
-        private ItemData item;
-        private System.Action<ItemData> onClick;
-        private InstallConfirmUI installConfirmUI;
+        public ItemData Item { get; private set; }
+        private int _stack;
+        private System.Action<ItemData> _onSelected;
 
-        public void Initialize(ItemData itemData, int quantity, System.Action<ItemData> clickCallback)
+        /// <summary>
+        /// Initialize with item, stack, and selection callback.
+        /// </summary>
+        public void Initialize(ItemData item, int stack, System.Action<ItemData> onSelected)
         {
-            item = itemData;
-            onClick = clickCallback;
+            Item = item;
+            _stack = stack;
+            _onSelected = onSelected;
 
-            iconImage.sprite = item.itemIcon;
-            iconImage.color = Color.white;
-            quantityText.text = quantity > 1 ? quantity.ToString() : "";
+            iconImage.sprite = item ? item.itemIcon : null;
+            stackText.text = stack > 1 ? stack.ToString() : "";
+            highlightObj.SetActive(false);
 
-            selectButton.onClick.AddListener(OnClicked);
-            SetSelected(false);
-
-            installConfirmUI = ServiceLocator.Get<InstallConfirmUI>();
+            button.onClick.RemoveAllListeners();
+            button.onClick.AddListener(OnClicked);
         }
 
         private void OnClicked()
         {
-            installConfirmUI.Show(item);
+            _onSelected?.Invoke(Item);
         }
 
-        public void SetSelected(bool isSelected)
+        /// <summary>
+        /// Visually highlights if selected.
+        /// </summary>
+        public void SetSelected(bool selected)
         {
-            highlightImage.gameObject.SetActive(isSelected);
+            highlightObj.SetActive(selected);
+        }
+
+        public void OnPointerEnter()
+        {
+            if (Item != null)
+                SelectionTooltipUI.Show(Item);
+        }
+        public void OnPointerExit()
+        {
+            SelectionTooltipUI.Hide();
         }
     }
 }

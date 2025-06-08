@@ -5,6 +5,10 @@ using HairvestMoon.Core;
 
 namespace HairvestMoon.UI
 {
+    /// <summary>
+    /// Handles the player’s backpack UI grid, updating slot displays and tool/upgrade slots.
+    /// Responds to inventory and equip events.
+    /// </summary>
     public class BackpackInventoryUI : MonoBehaviour, IBusListener
     {
         [Header("UI References")]
@@ -28,11 +32,15 @@ namespace HairvestMoon.UI
         [SerializeField] private EquipSlotUI harvestUpgradeSlot;
 
         private readonly Dictionary<ItemData, BackpackSlotUI> slots = new();
-        private ItemData currentSelectedItem;
+        private ItemData _currentSelectedItem;
 
+        private BackpackUpgradeManager _upgradeManager;
+        private BackpackInventorySystem _backpackInventory;
 
         public void InitializeUI()
         {
+            _upgradeManager = ServiceLocator.Get<BackpackUpgradeManager>();
+            _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
             BuildUI();
         }
 
@@ -43,6 +51,9 @@ namespace HairvestMoon.UI
             bus.ItemInstalled += OnItemInstalled;
         }
 
+        /// <summary>
+        /// Builds the UI grid. Only call this when slot/capacity structure changes!
+        /// </summary>
         private void BuildUI()
         {
             foreach (Transform child in backpackGridParent)
@@ -50,51 +61,47 @@ namespace HairvestMoon.UI
 
             slots.Clear();
 
-            int totalSlots = ServiceLocator.Get<BackpackUpgradeManager>().GetMaxUpgrades() * ServiceLocator.Get<BackpackUpgradeManager>().SlotsPerUpgrade + ServiceLocator.Get<BackpackUpgradeManager>().BaseSlots;
-            int unlockedSlots = ServiceLocator.Get<BackpackUpgradeManager>().GetCurrentSlots();
-
-            var allBackpackSlots = ServiceLocator.Get<BackpackInventorySystem>().GetAllSlots();
-            int filledSlots = allBackpackSlots.Count;
+            int unlockedSlots = _upgradeManager.GetCurrentSlots();
+            var allBackpackSlots = _backpackInventory.Slots;
 
             int filledIndex = 0;
-
-            for (int i = 0; i < totalSlots; i++)
+            for (int i = 0; i < unlockedSlots; i++)
             {
-                if (i < unlockedSlots)
+                if (filledIndex < allBackpackSlots.Count && allBackpackSlots[filledIndex].Item != null)
                 {
-                    if (filledIndex < filledSlots)
-                    {
-                        var slotGO = Instantiate(backpackSlotPrefab, backpackGridParent);
-                        var slot = slotGO.GetComponent<BackpackSlotUI>();
-                        var backpackData = allBackpackSlots[filledIndex];
-                        slot.Initialize(backpackData.item, backpackData.quantity, OnSlotSelected);
-                        slots[backpackData.item] = slot;
-                        filledIndex++;
-                    }
-                    else
-                    {
-                        Instantiate(emptyGridPrefab, backpackGridParent);
-                    }
+                    var slotGO = Instantiate(backpackSlotPrefab, backpackGridParent);
+                    var slot = slotGO.GetComponent<BackpackSlotUI>();
+                    var data = allBackpackSlots[filledIndex];
+                    slot.Initialize(data.Item, data.Stack, OnSlotSelected);
+                    slots[data.Item] = slot;
+                    filledIndex++;
                 }
                 else
                 {
-                    Instantiate(lockedGridPrefab, backpackGridParent);
+                    Instantiate(emptyGridPrefab, backpackGridParent);
                 }
             }
+            // TODO: Add lockedGridPrefab for locked slots if using upgrades beyond current unlocks
         }
 
+        /// <summary>
+        /// Refreshes slot visuals and selection (after inventory changes).
+        /// </summary>
         public void RefreshUI()
         {
-            BuildUI();
-            UpdateSelection(currentSelectedItem);
+            BuildUI(); // For jam, this is fine. For polish, consider only updating contents, not structure.
+            UpdateSelection(_currentSelectedItem);
         }
 
         private void OnSlotSelected(ItemData selectedItem)
         {
-            currentSelectedItem = selectedItem;
+            _currentSelectedItem = selectedItem;
             UpdateSelection(selectedItem);
         }
 
+        /// <summary>
+        /// Visually highlights the selected slot and shows its details.
+        /// </summary>
         private void UpdateSelection(ItemData selectedItem)
         {
             foreach (var pair in slots)
@@ -106,6 +113,9 @@ namespace HairvestMoon.UI
                 itemDescriptionUI.Clear();
         }
 
+        /// <summary>
+        /// Rebuilds UI after equip/install events.
+        /// </summary>
         private void OnItemInstalled(ItemInstalledEventArgs args)
         {
             RefreshUI();

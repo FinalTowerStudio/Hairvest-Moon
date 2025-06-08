@@ -1,28 +1,49 @@
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 using HairvestMoon.Inventory;
 
 namespace HairvestMoon.UI
 {
+    /// <summary>
+    /// Displays a single equipped tool or upgrade slot in the UI.
+    /// Handles icon, highlight, tooltip, and state.
+    /// </summary>
     public class EquipSlotUI : MonoBehaviour
     {
         [SerializeField] private Image iconImage;
-        [SerializeField] private TMP_Text nameText;
+        [SerializeField] private GameObject highlightObj;
+        [SerializeField] private Button button;
 
-        public void SetSlot(ItemData item)
+        public ItemData Item { get; private set; }
+        private System.Action<ItemData> _onClicked;
+
+        /// <summary>
+        /// Sets the slot icon, equipped highlight, and click/tooltip behavior.
+        /// </summary>
+        public void SetItem(ItemData item, bool isEquipped, System.Action<ItemData> onClicked = null)
         {
-            if (item != null)
+            Item = item;
+            iconImage.sprite = item ? item.itemIcon : null;
+            highlightObj.SetActive(isEquipped);
+            gameObject.SetActive(item != null);
+
+            _onClicked = onClicked;
+            if (button != null)
             {
-                iconImage.sprite = item.itemIcon;
-                iconImage.color = Color.white;
-                nameText.text = item.itemName;
+                button.onClick.RemoveAllListeners();
+                if (_onClicked != null)
+                    button.onClick.AddListener(() => _onClicked(Item));
             }
-            else
-            {
-                iconImage.color = Color.clear;
-                nameText.text = "";
-            }
+        }
+
+        public void OnPointerEnter()
+        {
+            if (Item != null)
+                SelectionTooltipUI.Show(Item);
+        }
+        public void OnPointerExit()
+        {
+            SelectionTooltipUI.Hide();
         }
     }
 }

@@ -1,129 +1,190 @@
 using HairvestMoon.Core;
-using System;
+using HairvestMoon.Inventory;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace HairvestMoon.Inventory
 {
-    public class BackpackInventorySystem : MonoBehaviour, IBusListener
+    /// <summary>
+    /// Slot-based, player inventory for items. 
+    /// Each slot may have its own stack size, lock, or flags.
+    /// Fires events on changes.
+    /// </summary>
+    public class BackpackInventorySystem : IBusListener
     {
-        [System.Serializable]
-        public class BackpackSlot
-        {
-            public ItemData item;
-            public int quantity;
-        }
+        private List<BackpackSlotData> _slots = new();
+        public IReadOnlyList<BackpackSlotData> Slots => _slots;
 
-        [Header("Backpack Settings")]
-        public List<BackpackSlot> backpack = new();
-        
-        [NonSerialized] public int maxBackpackSlots;
+
+        private GameEventBus _eventBus;
+        private bool _isInitialized = false;
+
+        // --- Initialization and Bus Wiring ---
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
         {
-            // No initialization currently required.
+            Initialize();
+            _isInitialized = true;
         }
 
-        public bool CanAddItem(ItemData newItem, int amount = 1)
+        /// <summary>
+        /// Sets up (or clears) all backpack slots for a new game.
+        /// </summary>
+        public void Initialize(int slotCount = 12)
         {
-            // Check for stackable items already in backpack
-            foreach (var slot in backpack)
+            _slots.Clear();
+            for (int i = 0; i < slotCount; i++)
+                _slots.Add(new BackpackSlotData());
+            _eventBus.RaiseBackpackChanged();
+        }
+
+        /// <summary>
+        /// Checks if this item (with quantity) can be added to any slot.
+        /// </summary>
+        public bool CanAddItem(ItemData item, int quantity)
+        {
+            if (item == null || quantity <= 0) return false;
+
+            // Try to stack first (future: obey stack size)
+            foreach (var slot in _slots)
             {
-                if (slot.item == newItem)
-                {
-                    if (IsStackable(newItem))
-                    {
-                        return true; // stacking doesn't require slot space
-                    }
-                    break;
-                }
+                if (slot.Item == item /* && slot.Stack < item.MaxStackSize */)
+                    return true; // can stack
             }
 
-            // Check slot limit for non-stackables
-            return backpack.Count < maxBackpackSlots;
-        }
-
-
-        public bool AddItem(ItemData newItem, int amount = 1)
-        {
-            foreach (var slot in backpack)
+            // Try to find an empty slot
+            foreach (var slot in _slots)
             {
-                if (slot.item == newItem)
-                {
-                    if (IsStackable(newItem))
-                    {
-                        slot.quantity += amount;
-                        NotifyBackpackChanged();
-                        return true;
-                    }
-                    break;
-                }
+                if (slot.Item == null)
+                    return true;
             }
-
-            if (backpack.Count >= maxBackpackSlots)
-            {
-                Debug.Log("Backpack full.");
-                return false;
-            }
-
-            backpack.Add(new BackpackSlot { item = newItem, quantity = amount });
-            NotifyBackpackChanged();
-            return true;
+            return false; // No space
         }
 
-        private bool IsStackable(ItemData item)
+        /// <summary>
+        /// Add an item to the first available slot (or stack if allowed). Returns true if added.
+        /// </summary>
+        public bool AddItem(ItemData item, int quantity)
         {
-            return item.itemType == ItemType.QuestItem
-                || item.itemType == ItemType.Currency
-                || item.itemType == ItemType.Fertilizer;
-        }
+            if (item == null || quantity <= 0) return false;
 
-        public bool RemoveItem(ItemData item, int amount = 1)
-        {
-            for (int i = 0; i < backpack.Count; i++)
+            // Try to stack with existing, if stackable (future: add IsStackable flag)
+            for (int i = 0; i < _slots.Count; i++)
             {
-                if (backpack[i].item == item)
+                var slot = _slots[i];
+                if (slot.Item == item /* && slot.Stack < item.MaxStackSize */) // TODO: for stack size
                 {
-                    if (backpack[i].quantity < amount)
-                        return false;
-
-                    backpack[i].quantity -= amount;
-                    if (backpack[i].quantity <= 0)
-                        backpack.RemoveAt(i);
-
-                    NotifyBackpackChanged();
+                    slot.Stack += quantity;
+                    _eventBus.RaiseBackpackChanged();
                     return true;
                 }
             }
-            return false;
-        }
 
-        public int GetQuantity(ItemData queryItem)
-        {
-            foreach (var slot in backpack)
+            // Place in first empty slot
+            for (int i = 0; i < _slots.Count; i++)
             {
-                if (slot.item == queryItem)
-                    return slot.quantity;
+                var slot = _slots[i];
+                if (slot.Item == null)
+                {
+                    slot.Item = item;
+                    slot.Stack = quantity;
+                    _eventBus.RaiseBackpackChanged();
+                    return true;
+                }
             }
-            return 0;
+            return false; // Backpack full
         }
 
-        public void ForceRefresh()
+        /// <summary>
+        /// Remove an item (from any slot). Returns true if successful.
+        /// </summary>
+        public bool RemoveItem(ItemData item, int quantity)
         {
-            NotifyBackpackChanged();
+            if (item == null || quantity <= 0) return false;
+
+            for (int i = 0; i < _slots.Count; i++)
+            {
+                var slot = _slots[i];
+                if (slot.Item == item && slot.Stack >= quantity)
+                {
+                    slot.Stack -= quantity;
+                    if (slot.Stack <= 0)
+                        slot.Clear();
+                    _eventBus.RaiseBackpackChanged();
+                    return true;
+                }
+            }
+            return false; // Not enough items found
         }
 
-        private void NotifyBackpackChanged()
+        /// <summary>
+        /// Moves an item from one slot to another (swap or merge).
+        /// </summary>
+        public bool MoveItem(int fromIndex, int toIndex)
         {
-            ServiceLocator.Get<GameEventBus>().RaiseBackpackChanged();
+            if (!IsValidSlot(fromIndex) || !IsValidSlot(toIndex)) return false;
+            if (fromIndex == toIndex) return false;
+
+            var from = _slots[fromIndex];
+            var to = _slots[toIndex];
+
+            // Simple swap if destination is empty or different item
+            if (to.Item == null || to.Item != from.Item)
+            {
+                (_slots[fromIndex], _slots[toIndex]) = (_slots[toIndex], _slots[fromIndex]);
+                _eventBus.RaiseBackpackChanged();
+                return true;
+            }
+            // Merge stacks if same item (future: obey MaxStackSize)
+            // TODO: For now, just sum, but clamp if needed
+            to.Stack += from.Stack;
+            from.Clear();
+            _eventBus.RaiseBackpackChanged();
+            return true;
         }
 
-        public List<BackpackSlot> GetAllSlots() => backpack;
+        /// <summary>
+        /// Get total quantity of a specific item in backpack.
+        /// </summary>
+        public int GetQuantity(ItemData item)
+        {
+            int qty = 0;
+            foreach (var slot in _slots)
+                if (slot.Item == item)
+                    qty += slot.Stack;
+            return qty;
+        }
+
+        /// <summary>
+        /// Find the first slot index containing this item (or -1).
+        /// </summary>
+        public int FindItemSlot(ItemData item)
+        {
+            for (int i = 0; i < _slots.Count; i++)
+                if (_slots[i].Item == item)
+                    return i;
+            return -1;
+        }
+
+        private bool IsValidSlot(int index) => index >= 0 && index < _slots.Count;
+
+        // --- Slot Data Helper Class ---
+        [System.Serializable]
+        public class BackpackSlotData
+        {
+            public ItemData Item;
+            public int Stack;
+
+            public void Clear()
+            {
+                Item = null;
+                Stack = 0;
+            }
+        }
     }
 }

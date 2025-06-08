@@ -1,90 +1,109 @@
+using System.Collections.Generic;
 using UnityEngine;
 using HairvestMoon.Inventory;
-using System.Collections.Generic;
 using HairvestMoon.Core;
+using HairvestMoon.Tool;
 
 namespace HairvestMoon.UI
 {
+    /// <summary>
+    /// UI for selecting and equipping a hoe tool or upgrade.
+    /// Shows all available options, highlights current equip.
+    /// </summary>
     public class HoeSelectionUI : MonoBehaviour, IBusListener
     {
-        [Header("UI References")]
-        [SerializeField] private GameObject hoeSelectionSlotPrefab;
-        [SerializeField] private Transform gridParent;
+        [SerializeField] private Transform optionParent;
+        [SerializeField] private SelectionSlotUI optionPrefab;
 
-        private List<UpgradeSelectionSlot> slots = new();
-        private ItemData currentSelectedHoeOption;
-        private CanvasGroup hoeSelectionCanvasGroup;
-
-        public void InitializeUI()
-        {
-            hoeSelectionCanvasGroup = GetComponent<CanvasGroup>();
-            BuildUI();
-        }
+        private List<SelectionSlotUI> _slots = new();
+        private BackpackInventorySystem _backpackInventory;
+        private BackpackEquipSystem _equipSystem;
+        private BackpackEquipInstallManager _equipInstallManager;
+        private GameEventBus _eventBus;
+        private bool _isOpen = false;
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged += RefreshUI;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.BackpackChanged += RefreshUI;
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
+        private void OnGlobalSystemsInitialized()
+        {
+            _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
+            _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
+            _equipInstallManager = ServiceLocator.Get<BackpackEquipInstallManager>();
+            BuildOptions();
+            RefreshUI();
+        }
+
+        /// <summary>
+        /// Builds option slots for all owned hoe tools/upgrades.
+        /// </summary>
+        private void BuildOptions()
+        {
+            foreach (Transform child in optionParent) Destroy(child.gameObject);
+            _slots.Clear();
+
+            foreach (var slot in _backpackInventory.Slots)
+            {
+                if (slot.Item != null && slot.Item.toolType == ToolType.Hoe)
+                {
+                    var slotUI = Instantiate(optionPrefab, optionParent);
+                    slotUI.Initialize(slot.Item, OnOptionSelected);
+                    _slots.Add(slotUI);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Called when player selects a hoe option.
+        /// </summary>
+        private void OnOptionSelected(ItemData item)
+        {
+            if (_equipInstallManager.TryInstallItem(item))
+                RefreshUI();
+            // TODO: Play sound, show feedback, close menu if you wish
+        }
+
+        /// <summary>
+        /// Highlights the currently equipped hoe.
+        /// </summary>
+        public void RefreshUI()
+        {
+            foreach (var slotUI in _slots)
+            {
+                bool isEquipped = (_equipSystem.hoeTool == slotUI.Item || _equipSystem.hoeUpgrade == slotUI.Item);
+                slotUI.SetSelected(isEquipped);
+            }
+        }
+
+        /// <summary>
+        /// Opens the selection menu (show/hide logic).
+        /// </summary>
         public void OpenHoeMenu()
         {
+            _isOpen = true;
             gameObject.SetActive(true);
-            BuildUI();
-            hoeSelectionCanvasGroup.alpha = 1f;
-            hoeSelectionCanvasGroup.interactable = true;
-            hoeSelectionCanvasGroup.blocksRaycasts = true;
+            RefreshUI();
         }
 
         public void CloseHoeMenu()
         {
+            _isOpen = false;
             gameObject.SetActive(false);
-            hoeSelectionCanvasGroup.alpha = 0f;
-            hoeSelectionCanvasGroup.interactable = false;
-            hoeSelectionCanvasGroup.blocksRaycasts = false;
         }
 
-        private void BuildUI()
-        {
-            foreach (Transform child in gridParent)
-                Destroy(child.gameObject);
-            slots.Clear();
-
-            // Always add Normal Hoe option
-            var slotGO = Instantiate(hoeSelectionSlotPrefab, gridParent);
-            var slotUI = slotGO.GetComponent<UpgradeSelectionSlot>();
-            slotUI.Initialize(null, OnHoeOptionSelected);
-            slotUI.SetSelected(currentSelectedHoeOption == null);
-            slots.Add(slotUI);
-
-            // If we have Hoe Upgrade equipped, enable selection
-            var hoeUpgrade = ServiceLocator.Get<BackpackEquipSystem>().hoeUpgrade;
-            if (hoeUpgrade != null)
-            {
-                var upgradeGO = Instantiate(hoeSelectionSlotPrefab, gridParent);
-                var upgradeSlotUI = upgradeGO.GetComponent<UpgradeSelectionSlot>();
-                upgradeSlotUI.Initialize(hoeUpgrade, OnHoeOptionSelected);
-                upgradeSlotUI.SetSelected(hoeUpgrade == currentSelectedHoeOption);
-                slots.Add(upgradeSlotUI);
-            }
-        }
-
-        private void RefreshUI()
-        {
-            BuildUI();
-        }
-
-        private void OnHoeOptionSelected(ItemData selectedItem)
-        {
-            currentSelectedHoeOption = selectedItem;
-
-            foreach (var slot in slots)
-                slot.SetSelected(slot.Item == currentSelectedHoeOption);
-        }
-
+        /// <summary>
+        /// Returns currently selected option (for external queries).
+        /// </summary>
         public ItemData GetCurrentSelectedItem()
         {
-            return currentSelectedHoeOption;
+            foreach (var slotUI in _slots)
+                if (slotUI.IsSelected)
+                    return slotUI.Item;
+            return null;
         }
     }
 }

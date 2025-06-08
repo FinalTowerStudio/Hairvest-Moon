@@ -5,45 +5,58 @@ namespace HairvestMoon.Core
     // Enum-driven state machine (Gameplay, Dialogue, Pause, etc.)
     // Broadcasts changes via OnGameStateChanged
     // Used to lock input, pause systems, manage cutscenes or tasks
-    public class GameStateManager : MonoBehaviour, IBusListener
+    public class GameStateManager : IBusListener
     {
         public GameState CurrentState { get; private set; }
-
         public bool IsInputLocked { get; private set; } = false;
+
+        private bool isInitialized = false;
+        private GameEventBus _eventBus;
+        private GameTimeManager _timeManager;
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
         {
             Initialize();
+            isInitialized = true;
         }
 
         public void Initialize()
         {
-            SetState(GameState.FreeRoam);
+            _timeManager = ServiceLocator.Get<GameTimeManager>();
+            // Set the initial game state to FreeRoam for now, if we want to change it later here is the place.
+            SetStateInternal(GameState.FreeRoam);
         }
 
-        public void SetState(GameState newState)
+        public bool RequestStateChange(GameState newState)
         {
-            if (newState == CurrentState) return;
+            // Insert guards, conditions, or debugging here as we expand!
+            return SetStateInternal(newState);
+        }
+
+        private bool SetStateInternal(GameState newState)
+        {
+            if (newState == CurrentState) return false;
 
             CurrentState = newState;
-            ServiceLocator.Get<GameEventBus>().RaiseGameStateChanged(CurrentState);
+            _eventBus.RaiseGameStateChanged(CurrentState);
 
             HandleTimeControl();
             HandleInputLock();
+            return true;
         }
 
         private void HandleTimeControl()
         {
             if (CurrentState == GameState.Menu || CurrentState == GameState.Dialogue || CurrentState == GameState.Cutscene)
-                ServiceLocator.Get<GameTimeManager>().FreezeTime();
+                _timeManager?.FreezeTime();
             else
-                ServiceLocator.Get<GameTimeManager>().ResumeTime();
+                _timeManager?.ResumeTime();
         }
 
         private void HandleInputLock()
@@ -52,7 +65,7 @@ namespace HairvestMoon.Core
             if (shouldLock != IsInputLocked)
             {
                 IsInputLocked = shouldLock;
-                ServiceLocator.Get<GameEventBus>().RaiseInputLockChanged(IsInputLocked);
+                _eventBus.RaiseInputLockChanged(IsInputLocked);
             }
         }
 

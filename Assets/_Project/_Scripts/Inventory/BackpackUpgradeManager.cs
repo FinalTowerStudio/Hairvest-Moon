@@ -1,60 +1,39 @@
 using HairvestMoon.Core;
-using UnityEngine;
 
 namespace HairvestMoon.Inventory
 {
-    public class BackpackUpgradeManager : MonoBehaviour, IBusListener
+    public class BackpackUpgradeManager : IBusListener
     {
-        [Header("Upgrade Settings")]
-        [SerializeField] private int baseSlots = 10;
-        [SerializeField] private int maxUpgrades = 10;
-        [SerializeField] private int slotsPerUpgrade = 2;
+        private bool isInitialized = false;
+
+        private const int baseSlots = 10;
+        private int extraSlots = 20;
+        private const int slotsPerUpgrade = 2;
 
         public int SlotsPerUpgrade => slotsPerUpgrade;
         public int BaseSlots => baseSlots;
-
-        private int upgradeLevel = 0;
+        public int GetCurrentSlots() => baseSlots + (extraSlots * slotsPerUpgrade);
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            ServiceLocator.Get<GameEventBus>().GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
         {
             Initialize();
+            isInitialized = true;
         }
 
         public void Initialize()
         {
-            ApplyUpgrade();
+            extraSlots = 20;
         }
 
-        public void UpgradeBackpack()
+        public void ApplyBackpackUpgrade()
         {
-            if (upgradeLevel < maxUpgrades)
-            {
-                upgradeLevel++;
-                ApplyUpgrade();
-                Debug.Log($"Backpack upgraded to level {upgradeLevel}");
-            }
-            else
-            {
-                Debug.Log("Backpack fully upgraded.");
-            }
+            extraSlots++;
+            ServiceLocator.Get<GameEventBus>().RaiseBackpackChanged();
         }
-
-        private void ApplyUpgrade()
-        {
-            int totalSlots = baseSlots + (upgradeLevel * slotsPerUpgrade);
-            ServiceLocator.Get<BackpackInventorySystem>().maxBackpackSlots = totalSlots;
-            ServiceLocator.Get<BackpackInventorySystem>().ForceRefresh();
-        }
-
-
-        public int GetUpgradeLevel() => upgradeLevel;
-        public int GetMaxUpgrades() => maxUpgrades;
-        public int GetCurrentSlots() => ServiceLocator.Get<BackpackInventorySystem>().maxBackpackSlots;
     }
 }

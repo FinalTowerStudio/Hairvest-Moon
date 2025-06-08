@@ -4,6 +4,10 @@ using UnityEngine;
 
 namespace HairvestMoon.Farming
 {
+    /// <summary>
+    /// Holds all seed types for look-up and UI purposes. 
+    /// Fast lookup from ItemData (inventory) to SeedData.
+    /// </summary>
     public class SeedDatabase : MonoBehaviour, IBusListener
     {
         [SerializeField] private List<SeedData> allSeeds;
@@ -20,19 +24,29 @@ namespace HairvestMoon.Farming
 
         private void OnGlobalSystemsInitialized()
         {
-            InitializeSeedDatabase();
+            BuildSeedLookup();
         }
 
-        public void InitializeSeedDatabase()
+        /// <summary>
+        /// Builds the lookup dictionary from item to seed.
+        /// </summary>
+        public void BuildSeedLookup()
         {
-            // Build dictionary now that list is loaded
+            lookup.Clear();
             foreach (var seed in allSeeds)
             {
                 if (seed.seedItem != null)
+                {
+                    if (lookup.ContainsKey(seed.seedItem))
+                        Debug.LogWarning($"Duplicate seedItem in SeedDatabase: {seed.seedItem.name}");
                     lookup[seed.seedItem] = seed;
+                }
             }
         }
 
+        /// <summary>
+        /// Returns the SeedData for a given item (if it is a seed).
+        /// </summary>
         public SeedData GetSeedDataByItem(ItemData item)
         {
             lookup.TryGetValue(item, out var seedData);

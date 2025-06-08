@@ -1,6 +1,0 @@
-<ui:UXML xmlns:ui="UnityEngine.UIElements" xmlns:uie="UnityEditor.UIElements" cb="CodeBuddy" editor-extension-mode="False">
-    <Style src="project://database/Assets/CodeBuddy/Editor/Layouts/ChatMessageStyles.uss?fileID=7433441132597879392&amp;guid=7a20fc2e2cd53d045bc75ef2042e6922&amp;type=3#ChatMessageStyles" />
-    <ui:VisualElement name="m_messagePanel" style="flex-grow: 1; background-color: rgba(56, 56, 56, 0.49); border-top-left-radius: 5px; border-top-right-radius: 5px; border-bottom-right-radius: 5px; border-bottom-left-radius: 5px; border-top-width: 0; border-right-width: 0; border-bottom-width: 0; border-left-width: 0; margin-top: 5px; margin-right: 5px; margin-bottom: 5px; margin-left: 5px; padding-top: 5px; padding-right: 5px; padding-bottom: 5px; padding-left: 5px;">
-        <CodeBuddy.ChatMessageComponent message-content="Sample Message" />
-    </ui:VisualElement>
-</ui:UXML>

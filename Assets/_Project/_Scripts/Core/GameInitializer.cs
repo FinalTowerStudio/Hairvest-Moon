@@ -4,6 +4,8 @@ using HairvestMoon.Interaction;
 using HairvestMoon.Inventory;
 using HairvestMoon.Player;
 using HairvestMoon.UI;
+using HairvestMoon.Utility;
+using System;
 using UnityEngine;
 
 public class GameInitializer : MonoBehaviour
@@ -20,30 +22,34 @@ public class GameInitializer : MonoBehaviour
     [SerializeField] private InputController inputController;
     [SerializeField] private Player_Controller playerController;
     [SerializeField] private PlayerFacingController playerFacingController;
+    [SerializeField] private PlayerStateController playerStateController;
 
     [Header("UI Panels")]
-    [SerializeField] private InstallConfirmUI installConfirmUI;
     [SerializeField] private MainMenuUIManager mainMenuUI;
     [SerializeField] private BackpackInventoryUI backpackInventoryUI;
-    [SerializeField] private InventoryOverviewUI inventoryOverviewUI;
+    [SerializeField] private ResourceInventoryUI inventoryOverviewUI;
+    [SerializeField] private InstallConfirmUI installConfirmUI;
     [SerializeField] private SeedSelectionUI seedSelectionUI;
-    [SerializeField] private WateringSelectionUI wateringSelectionUI;
     [SerializeField] private HoeSelectionUI hoeSelectionUI;
+    [SerializeField] private WateringSelectionUI wateringSelectionUI;
     [SerializeField] private HarvestSelectionUI harvestSelectionUI;
+    [SerializeField] private ToolHotbarUI toolHotbarUI;
     [SerializeField] private SelectionTooltipUI selectionTooltipUI;
-    [SerializeField] private BackpackCapacityBarUI backpackCapacityBarUI;
+    [SerializeField] private BackpackCapacityBarUI backpackCapacityBarUI;   
+    [SerializeField] private DebugUIOverlay debugOverlayUI;
 
     private void Awake()
     {
         ServiceLocator.Clear();
 
-        RegisterAllServices();
+        RegisterAllPureSystems();
+        RegisterAllSceneAssignedMonoBehaviours();
         InitializeUI();
         RegisterAllBusListeners();
-        ServiceLocator.Get<GameEventBus>().RaiseGlobalSystemsInitialized();
+        RaiseGlobalSystemsInitialized();
     }
 
-    private void RegisterAllServices()
+    private void RegisterAllPureSystems()
     {
         // Code-instantiated systems:
         ServiceLocator.Register(new GameEventBus());
@@ -57,8 +63,10 @@ public class GameInitializer : MonoBehaviour
         ServiceLocator.Register(new EquipManager());
         ServiceLocator.Register(new FarmGrowthSystem());
         ServiceLocator.Register(new WaterDecaySystem());
+    }
 
-        // Scene-assigned systems:
+    private void RegisterAllSceneAssignedMonoBehaviours()
+    {
         ServiceLocator.Register(farmTileDataManager);
         ServiceLocator.Register(farmToolHandler);
         ServiceLocator.Register(waterVisualSystem);
@@ -68,6 +76,7 @@ public class GameInitializer : MonoBehaviour
         ServiceLocator.Register(inputController);
         ServiceLocator.Register(playerController);
         ServiceLocator.Register(playerFacingController);
+        ServiceLocator.Register(playerStateController);
         ServiceLocator.Register(installConfirmUI);
         ServiceLocator.Register(mainMenuUI);
         ServiceLocator.Register(backpackInventoryUI);
@@ -78,25 +87,21 @@ public class GameInitializer : MonoBehaviour
         ServiceLocator.Register(harvestSelectionUI);
         ServiceLocator.Register(selectionTooltipUI);
         ServiceLocator.Register(backpackCapacityBarUI);
+        ServiceLocator.Register(toolHotbarUI);
+        ServiceLocator.Register(debugOverlayUI);
     }
 
     private void InitializeUI()
     {
-        installConfirmUI.InitializeUI();
         backpackInventoryUI.InitializeUI();
         inventoryOverviewUI.InitializeUI();
         mainMenuUI.InitializeUI();
-        seedSelectionUI.InitializeUI();
-        wateringSelectionUI.InitializeUI();
-        hoeSelectionUI.InitializeUI();
-        harvestSelectionUI.InitializeUI();
-        selectionTooltipUI.InitializeUI();
         backpackCapacityBarUI.InitializeUI();
+        debugOverlayUI.InitializeUI();
     }
 
     private void RegisterAllBusListeners()
     {
-        //installConfirmUI.RegisterBusListeners();
         backpackInventoryUI.RegisterBusListeners();
         inventoryOverviewUI.RegisterBusListeners();
         mainMenuUI.RegisterBusListeners();
@@ -104,17 +109,18 @@ public class GameInitializer : MonoBehaviour
         wateringSelectionUI.RegisterBusListeners();
         hoeSelectionUI.RegisterBusListeners();
         harvestSelectionUI.RegisterBusListeners();
-        //selectionTooltipUI.RegisterBusListeners();
         backpackCapacityBarUI.RegisterBusListeners();
         inputController.RegisterBusListeners();
         playerController.RegisterBusListeners();
-        //playerFacingController.RegisterBusListeners();
         farmTileDataManager.RegisterBusListeners();
         farmToolHandler.RegisterBusListeners();
         waterVisualSystem.RegisterBusListeners();
         cropVisualSystem.RegisterBusListeners();
-        //tileTargetingSystem.RegisterBusListeners();
         seedDatabase.RegisterBusListeners();
+        //playerFacingController.RegisterBusListeners();
+        //selectionTooltipUI.RegisterBusListeners();
+        //tileTargetingSystem.RegisterBusListeners();
+        //installConfirmUI.RegisterBusListeners();
         ServiceLocator.Get<GameStateManager>().RegisterBusListeners();
         ServiceLocator.Get<GameTimeManager>().RegisterBusListeners();
         ServiceLocator.Get<GameManager>().RegisterBusListeners();
@@ -125,5 +131,10 @@ public class GameInitializer : MonoBehaviour
         ServiceLocator.Get<EquipManager>().RegisterBusListeners();
         ServiceLocator.Get<FarmGrowthSystem>().RegisterBusListeners();
         ServiceLocator.Get<WaterDecaySystem>().RegisterBusListeners();
+    }
+
+    private void RaiseGlobalSystemsInitialized()
+    {
+        ServiceLocator.Get<GameEventBus>().RaiseGlobalSystemsInitialized();
     }
 }

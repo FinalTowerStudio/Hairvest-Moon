@@ -1,70 +1,68 @@
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
 using HairvestMoon.Core;
 using HairvestMoon.Inventory;
 
 namespace HairvestMoon.UI
 {
-    public class InstallConfirmUI : MonoBehaviour
+    /// <summary>
+    /// Shows a confirmation dialog for installing/equipping an item.
+    /// Calls BackpackEquipInstallManager if confirmed.
+    /// </summary>
+    public class InstallConfirmUI : MonoBehaviour, IBusListener
     {
-        [SerializeField] private GameObject rootPanel;
-        [SerializeField] private Image iconImage;
-        [SerializeField] private TextMeshProUGUI itemNameText;
-        [SerializeField] private Button installButton;
-        [SerializeField] private Button cancelButton;
-        [SerializeField] private CanvasGroup rootPanelCanvasGroup;
+        [Header("UI References")]
+        [SerializeField] private GameObject dialogRoot;
+        [SerializeField] private UnityEngine.UI.Button confirmButton;
+        [SerializeField] private UnityEngine.UI.Button cancelButton;
+        [SerializeField] private ItemDescriptionUI itemDescriptionUI;
 
-        private ItemData currentItem;
+        private BackpackEquipInstallManager _equipInstallManager;
+        private ItemData _pendingItem;
 
-        public void InitializeUI()
+        public void RegisterBusListeners()
         {
-            Hide();
-            installButton.onClick.AddListener(OnInstallClicked);
-            cancelButton.onClick.AddListener(Hide);
+            ServiceLocator.Get<GameEventBus>().GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
+        private void OnGlobalSystemsInitialized()
+        {
+            _equipInstallManager = ServiceLocator.Get<BackpackEquipInstallManager>();
+
+            // Button wiring
+            if (confirmButton != null)
+                confirmButton.onClick.AddListener(OnConfirm);
+            if (cancelButton != null)
+                cancelButton.onClick.AddListener(Hide);
+        }
+
+        /// <summary>
+        /// Show confirmation dialog for given item.
+        /// </summary>
         public void Show(ItemData item)
         {
-            currentItem = item;
-            iconImage.sprite = item.itemIcon;
-            itemNameText.text = item.itemName;
-            SetPanelVisible(true);
+            _pendingItem = item;
+            dialogRoot.SetActive(true);
+            if (itemDescriptionUI != null)
+                itemDescriptionUI.SetItem(item);
         }
 
-        private void OnInstallClicked()
-        {
-            var equipManager = ServiceLocator.Get<EquipManager>();
-
-            if (equipManager.TryEquip(currentItem))
-            {
-                // Safely remove installed item from correct inventory:
-                TryRemoveFromInventories(currentItem);
-            }
-
-            Hide();
-        }
-
-        private void TryRemoveFromInventories(ItemData item)
-        {
-            // Attempt both resource and backpack inventories
-            var resourceInventory = ServiceLocator.Get<ResourceInventorySystem>();
-            if (resourceInventory.RemoveItem(item, 1))
-                return;
-
-            var backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
-            backpackInventory.RemoveItem(item, 1);
-        }
-
+        /// <summary>
+        /// Hides dialog and clears pending item.
+        /// </summary>
         public void Hide()
         {
-            SetPanelVisible(false);
+            dialogRoot.SetActive(false);
+            _pendingItem = null;
+            if (itemDescriptionUI != null)
+                itemDescriptionUI.Clear();
         }
-        private void SetPanelVisible(bool visible)
+
+        private void OnConfirm()
         {
-            rootPanelCanvasGroup.alpha = visible ? 1f : 0f;
-            rootPanelCanvasGroup.interactable = visible;
-            rootPanelCanvasGroup.blocksRaycasts = visible;
+            if (_pendingItem == null) return;
+            bool installed = _equipInstallManager.TryInstallItem(_pendingItem);
+            // Optionally: play feedback SFX, show success/error
+            Hide();
         }
     }
 }

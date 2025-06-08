@@ -10,25 +10,27 @@ using UnityEngine.InputSystem;
 namespace HairvestMoon.Farming
 {
     /// <summary>
-    /// Handles farm tool interactions (Hoe, Water, Plant, Harvest) using the new input system.
+    /// Handles farm tool interactions: till, water, plant, harvest, including upgrades and fertilization.
     /// </summary>
-    public class FarmToolHandler : MonoBehaviour, IBusListener
+    public class FarmToolHandler : MonoBehaviour, IBusListener, ITickable
     {
         public enum ToolSlot { None, Hoe = 1, Water = 2, Plant = 3, Harvest = 4 }
 
         [Header("Tool Settings")]
         [SerializeField] private float interactionHoldDuration = 0.1f;
         [SerializeField] private Transform progressSlider;
-        [SerializeField] private SeedData selectedSeed;
 
         [Header("References")]
         [SerializeField] private InputActionReference interactAction;
 
-        private TileTargetingSystem targetingSystem;
-        private float currentHoldTime;
-        private bool isInteracting;
-        private bool isInitialized = false;
+        private TileTargetingSystem _targetingSystem;
+        private SeedData _selectedSeed;
+        private float _currentHoldTime;
+        private bool _isInteracting;
+        private bool _isInitialized = false;
         private Vector3Int? targetTile;
+
+        private ToolType _activeToolAtHoldStart = ToolType.None;
 
         public void RegisterBusListeners()
         {
@@ -43,61 +45,84 @@ namespace HairvestMoon.Farming
 
         public void Initialize()
         {
-            targetingSystem = ServiceLocator.Get<TileTargetingSystem>();
+            _targetingSystem = ServiceLocator.Get<TileTargetingSystem>();
             interactAction.action.performed += OnInteractPerformed;
             interactAction.action.canceled += OnInteractCanceled;
-            isInitialized = true;
+            _isInitialized = true;
         }
 
-        private void Update()
+        public void Tick(GameTimeChangedArgs args)
         {
-            if (!isInteracting || !isInitialized) return;
+            if (!_isInteracting || !_isInitialized) return;
 
-            targetTile = targetingSystem.CurrentTargetedTile;
+            // Defensive: cancel if tool was swapped during interaction
+            if (ServiceLocator.Get<ToolSystem>().CurrentTool != _activeToolAtHoldStart)
+            {
+                CancelInteraction("Tool swapped!");
+                return;
+            }
+
+            targetTile = _targetingSystem.CurrentTargetedTile;
             if (!targetTile.HasValue) return;
 
-            currentHoldTime += Time.deltaTime;
+            _currentHoldTime += Time.deltaTime;
             UpdateSliderVisual();
 
-            if (currentHoldTime >= interactionHoldDuration)
+            if (_currentHoldTime >= interactionHoldDuration)
             {
                 CompleteInteraction();
             }
         }
 
+        /// <summary>
+        /// Begins a tool interaction on valid tile.
+        /// </summary>
         private void OnInteractPerformed(InputAction.CallbackContext context)
         {
             if (!ServiceLocator.Get<GameStateManager>().IsFreeRoam()) return;
 
-            targetTile = targetingSystem.CurrentTargetedTile;
+            targetTile = _targetingSystem.CurrentTargetedTile;
             if (!targetTile.HasValue)
             {
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("No valid tile");
+                ShowDebug("No valid tile");
                 return;
             }
 
-            isInteracting = true;
-            currentHoldTime = 0f;
+            _isInteracting = true;
+            _currentHoldTime = 0f;
+            _activeToolAtHoldStart = ServiceLocator.Get<ToolSystem>().CurrentTool;
+
             progressSlider.gameObject.SetActive(true);
             PositionSliderAtTarget();
         }
 
+        /// <summary>
+        /// Cancels interaction on input release or tool swap.
+        /// </summary>
         private void OnInteractCanceled(InputAction.CallbackContext context)
         {
-            if (!isInteracting) return;
-
-            isInteracting = false;
-            progressSlider.gameObject.SetActive(false);
-
-            if (currentHoldTime < interactionHoldDuration)
-            {
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Interaction cancelled");
-            }
+            if (!_isInteracting) return;
+            CancelInteraction("Interaction cancelled");
         }
 
+        /// <summary>
+        /// Instantly cancels interaction with feedback.
+        /// </summary>
+        private void CancelInteraction(string reason)
+        {
+            _isInteracting = false;
+            progressSlider.gameObject.SetActive(false);
+            ShowDebug(reason);
+            // TODO: Play cancel sound if desired
+        }
+
+        /// <summary>
+        /// Executes the tool's action after hold completes.
+        /// Add SFX/VFX hooks here for all tool actions.
+        /// </summary>
         private void CompleteInteraction()
         {
-            isInteracting = false;
+            _isInteracting = false;
             progressSlider.gameObject.SetActive(false);
 
             if (!targetTile.HasValue) return;
@@ -124,15 +149,25 @@ namespace HairvestMoon.Farming
                     break;
 
                 default:
-                    ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("No tool selected");
+                    ShowDebug("No tool selected");
                     break;
             }
+
+            // --- SFX/VFX hook ---
+            // TODO: Play generic "tool used" sound, or
+            // trigger animation here, based on ToolType.
         }
 
+
+        /// <summary>
+        /// Tills a tile, applies upgrades and bonus area if equipped.
+        /// </summary>
         private void TryTill(Vector3Int tile, FarmTileData data)
-        {   
+        {
             ServiceLocator.Get<FarmTileDataManager>().SetTilled(tile, true);
-            ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Tile tilled");
+            ShowDebug("Tile tilled");
+
+            // --- SFX/VFX hook: play "till" sound, dust particle ---
 
             // Apply Upgrade Behavior if selected
             var hoeUpgrade = ServiceLocator.Get<BackpackEquipSystem>().hoeUpgrade;
@@ -140,26 +175,30 @@ namespace HairvestMoon.Farming
 
             if (selectedOption != null && hoeUpgrade != null)
             {
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction($"Hoe Upgrade Used: {selectedOption.itemName}");
-
-                // Apply bonus tilling logic here:
+                ShowDebug($"Hoe Upgrade Used: {selectedOption.itemName}");
+                // TODO: Play "upgrade" particle or effect here
                 ApplyExtraTilling(tile);
             }
         }
 
+        /// <summary>
+        /// Waters a tile, optionally applies fertilizer.
+        /// </summary>
         private void TryWater(Vector3Int tile, FarmTileData data)
         {
             ServiceLocator.Get<ToolSystem>().ConsumeWaterFromCan();
 
             if (!data.isTilled)
             {
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Water wasted — not tilled");
+                ShowDebug("Water wasted — not tilled");
+                // TODO: Play "fail" sound or splatter VFX
                 return;
             }
 
             // Always apply water normally
             ServiceLocator.Get<FarmTileDataManager>().SetWatered(tile, true);
-            ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Water applied");
+            ShowDebug("Water applied");
+            // TODO: Play "watering" sound, water spray VFX
 
             // Check if Fertilizer Sprayer is equipped
             var wateringUpgrade = ServiceLocator.Get<BackpackEquipSystem>().wateringUpgrade;
@@ -174,46 +213,54 @@ namespace HairvestMoon.Farming
                     bool removed = ServiceLocator.Get<BackpackInventorySystem>().RemoveItem(selectedFertilizer, 1);
                     if (removed)
                     {
-                        ServiceLocator.Get<DebugUIOverlay>().ShowLastAction($"Fertilizer applied: {selectedFertilizer.itemName}");
-                        // You can expand here to actually apply fertilizer effects to tile data later.
+                        ShowDebug($"Fertilizer applied: {selectedFertilizer.itemName}");
+                        // TODO: Apply actual fertilizer logic, spawn particle here
                     }
                     else
                     {
-                        ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("No fertilizer available.");
+                        ShowDebug("No fertilizer available.");
                     }
                 }
             }
         }
 
-
+        /// <summary>
+        /// Attempts to plant a seed on a tile.
+        /// </summary>
         private void TryPlantSeed(Vector3Int tile, FarmTileData data)
         {
-            if (data.isTilled && data.plantedCrop == null && selectedSeed != null)
+            if (data.isTilled && data.plantedCrop == null && _selectedSeed != null)
             {
-                int seedCount = ServiceLocator.Get<ResourceInventorySystem>().GetQuantity(selectedSeed.seedItem);
+                int seedCount = ServiceLocator.Get<ResourceInventorySystem>().GetQuantity(_selectedSeed.seedItem);
                 if (seedCount <= 0)
                 {
-                    ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("No seeds available");
+                    ShowDebug("No seeds available");
+                    // TODO: Play "fail" sound
                     return;
                 }
 
-                bool removed = ServiceLocator.Get<ResourceInventorySystem>().RemoveItem(selectedSeed.seedItem, 1);
+                bool removed = ServiceLocator.Get<ResourceInventorySystem>().RemoveItem(_selectedSeed.seedItem, 1);
                 if (!removed)
                 {
-                    ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Failed to consume seed");
+                    ShowDebug("Failed to consume seed");
+                    // TODO: Play "fail" sound
                     return;
                 }
 
-                data.plantedCrop = selectedSeed.cropData;
+                data.plantedCrop = _selectedSeed.cropData;
                 data.wateredMinutesAccumulated = 0f;
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction($"Planted {selectedSeed.cropData.cropName}");
+                ShowDebug($"Planted {_selectedSeed.cropData.cropName}");
+                // TODO: Play "planting" sound, dirt puff particle
             }
             else
             {
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Can't plant here");
+                ShowDebug("Can't plant here");
             }
         }
 
+        /// <summary>
+        /// Harvests a ripe crop, adds to inventory, clears tile.
+        /// </summary>
         private void TryHarvest(Vector3Int tile, FarmTileData data)
         {
             if (data.HasRipeCrop())
@@ -225,24 +272,29 @@ namespace HairvestMoon.Farming
 
                 if (added)
                 {
-                    ServiceLocator.Get<DebugUIOverlay>().ShowLastAction($"Harvested {yield}x {harvestedItem.itemName}");
+                    ShowDebug($"Harvested {yield}x {harvestedItem.itemName}");
                     data.plantedCrop = null;
                     data.wateredMinutesAccumulated = 0f;
+                    // TODO: Play "harvest" sound, burst VFX, maybe screen shake
                 }
                 else
                 {
-                    ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Inventory Full - Harvest Failed");
+                    ShowDebug("Inventory Full - Harvest Failed");
+                    // TODO: Play "fail" sound
                 }
             }
             else
             {
-                ServiceLocator.Get<DebugUIOverlay>().ShowLastAction("Nothing to harvest");
+                ShowDebug("Nothing to harvest");
+                // TODO: Play "fail" sound
             }
         }
 
+        /// <summary>
+        /// Applies area effect tilling for upgrades (e.g., 3x3 radius).
+        /// </summary>
         private void ApplyExtraTilling(Vector3Int centerTile)
         {
-            // Simple 3x3 till radius as an example:
             for (int dx = -1; dx <= 1; dx++)
             {
                 for (int dy = -1; dy <= 1; dy++)
@@ -252,27 +304,45 @@ namespace HairvestMoon.Farming
                     if (!tileData.isTilled)
                     {
                         ServiceLocator.Get<FarmTileDataManager>().SetTilled(nearbyTile, true);
+                        // TODO: Particle/SFX for bonus tiles?
                     }
                 }
             }
         }
 
+        /// <summary>
+        /// Sets the currently selected seed for planting.
+        /// </summary>
         public void SetSelectedSeed(SeedData newSeed)
         {
-            selectedSeed = newSeed;
+            _selectedSeed = newSeed;
         }
 
+        /// <summary>
+        /// Positions progress slider over targeted tile.
+        /// </summary>
         private void PositionSliderAtTarget()
         {
             if (!targetTile.HasValue) return;
-            Vector3 worldPos = targetingSystem.Grid.CellToWorld(targetTile.Value);
+            Vector3 worldPos = _targetingSystem.Grid.CellToWorld(targetTile.Value);
             progressSlider.position = worldPos + Vector3.up;
         }
 
+        /// <summary>
+        /// Visually updates the progress slider fill.
+        /// </summary>
         private void UpdateSliderVisual()
         {
-            float progress = Mathf.Clamp01(currentHoldTime / interactionHoldDuration);
+            float progress = Mathf.Clamp01(_currentHoldTime / interactionHoldDuration);
             progressSlider.localScale = new Vector3(progress, 1f, 1f);
+        }
+
+        /// <summary>
+        /// Shows debug feedback overlay for user actions.
+        /// </summary>
+        private void ShowDebug(string message)
+        {
+            ServiceLocator.Get<DebugUIOverlay>().ShowLastAction(message);
         }
     }
 }

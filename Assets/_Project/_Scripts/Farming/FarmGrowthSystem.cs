@@ -1,49 +1,56 @@
 using HairvestMoon.Core;
-using UnityEngine;
 
 namespace HairvestMoon.Farming
 {
     /// <summary>
-    /// Handles daily crop growth only.
-    /// Subscribes to GameTimeManager.OnDawn to tick crops once per day.
+    /// Handles all crop growth logic. Advances planted crops each minute (if watered).
     /// </summary>
-    public class FarmGrowthSystem : MonoBehaviour, IBusListener
+    public class FarmGrowthSystem : IBusListener
     {
         private bool isInitialized = false;
+        private FarmTileDataManager _farmTileDataManager;
+        private GameEventBus _eventBus;
+        private CropVisualSystem _cropVisualSystem;
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
-            bus.TimeChanged += OnMinuteGrowthTick;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus.TimeChanged += OnMinuteGrowthTick;
         }
 
         private void OnGlobalSystemsInitialized()
         {
+            _farmTileDataManager = ServiceLocator.Get<FarmTileDataManager>();
+            _cropVisualSystem = ServiceLocator.Get<CropVisualSystem>();
             isInitialized = true;
         }
 
-        private void OnMinuteGrowthTick(TimeChangedArgs args)
+        /// <summary>
+        /// Advance growth for all planted, watered crops by one minute.
+        /// </summary>
+        private void OnMinuteGrowthTick(GameTimeChangedArgs args)
         {
             if (!isInitialized) return;
 
-            foreach (var entry in ServiceLocator.Get<FarmTileDataManager>().AllTileData)
+            foreach (var entry in _farmTileDataManager.AllTileData)
             {
-                var pos = entry.Key;
                 var data = entry.Value;
+                if (data.plantedCrop == null) continue;
+                if (!data.isWatered) continue;
 
-                if (data.plantedCrop != null)
+                data.wateredMinutesAccumulated++;
+                if (data.wateredMinutesAccumulated > data.plantedCrop.growthDurationMinutes)
+                    data.wateredMinutesAccumulated = data.plantedCrop.growthDurationMinutes;
+
+                // Check for just completed
+                if (data.IsJustFullyGrown())
                 {
-                    data.wateredMinutesAccumulated += 1;
-
-                    if (data.wateredMinutesAccumulated >= data.plantedCrop.growthDurationMinutes)
-                    {
-                        data.wateredMinutesAccumulated = data.plantedCrop.growthDurationMinutes;
-                    }
+                    _cropVisualSystem.TriggerCropCompletedVFX(entry.Key);
+                    // Optional: _eventBus.RaiseCropFullyGrown(entry.Key);
                 }
             }
         }
 
     }
-
 }

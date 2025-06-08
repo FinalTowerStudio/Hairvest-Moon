@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace HairvestMoon.Core
@@ -7,42 +8,67 @@ namespace HairvestMoon.Core
     // Notifies listeners every in-game minute
     // Provides GetFormattedTime() and IsNight() helpers
 
-    public class GameTimeManager : MonoBehaviour, IBusListener
+    public class GameTimeManager : IBusListener
     {
-        [Header("Time Settings")]
-        [SerializeField] private float secondsPerGameMinute = 1f;
-        [SerializeField] private int dawnHour = 6;
-        [SerializeField] private int duskHour = 18;
+        private readonly float secondsPerGameMinute = 1f;
+        private readonly int dawnHour = 6;
+        private readonly int duskHour = 18;
 
         public int CurrentHour { get; private set; } = 6;
         public int CurrentMinute { get; private set; } = 0;
         public int Day { get; private set; } = 1;
-        public bool IsTimeFrozen { get; private set; } = false;
         public float TimeScale { get; private set; } = 1f;
 
         private float _timer;
         private bool _isNight = false;
         private bool isInitialized = false;
+        private bool isTimeFrozen = false;
+        private GameEventBus _eventBus;
+
+        private List<ITickable> tickables = new List<ITickable>();
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
         {
+            Initialize();
             isInitialized = true;
         }
 
-        private void Update()
+        public void Initialize()
         {
-            if (!isInitialized || IsTimeFrozen) return;
+            //Could eventually support loading from save by overriding Initialize() with custom hour/minute/day values.
+            CurrentHour = 6;
+            CurrentMinute = 0;
+            _timer = 0;
+            _isNight = false;
+            isTimeFrozen = false;
+        }
 
-            _timer += Time.deltaTime * TimeScale;
-            if (_timer >= secondsPerGameMinute)
+        public void RegisterTickable(ITickable tickable)
+        {
+            if (!tickables.Contains(tickable))
+                tickables.Add(tickable);
+        }
+
+        public void UnregisterTickable(ITickable tickable)
+        {
+            tickables.Remove(tickable);
+            //consider logging when trying to remove a non existent tickable
+        }
+
+        public void Tick(float deltaTime)
+        {
+            if (!isInitialized || isTimeFrozen) return;
+
+            _timer += deltaTime * TimeScale;
+            while (_timer >= secondsPerGameMinute)
             {
-                _timer = 0f;
+                _timer -= secondsPerGameMinute;
                 AdvanceMinute();
             }
         }
@@ -64,14 +90,19 @@ namespace HairvestMoon.Core
                 CheckTimeTriggers();
             }
 
-            ServiceLocator.Get<GameEventBus>().RaiseTimeChanged(CurrentHour, CurrentMinute);
+            var args = new GameTimeChangedArgs(CurrentHour, CurrentMinute, Day);
+
+            foreach (var tickable in tickables)
+                tickable.Tick(args);
+
+            _eventBus.RaiseTimeChanged(args);
         }
 
 
         public void AdvanceDay()
         {
             Day++;
-            ServiceLocator.Get<GameEventBus>().RaiseDawn();
+            _eventBus.RaiseNewDay();  
         }
 
         private void CheckTimeTriggers()
@@ -79,12 +110,12 @@ namespace HairvestMoon.Core
             if (!_isNight && CurrentHour >= duskHour)
             {
                 _isNight = true;
-                ServiceLocator.Get<GameEventBus>().RaiseDusk();
+                _eventBus.RaiseDusk();
             }
             else if (_isNight && CurrentHour >= dawnHour && CurrentHour < duskHour)
             {
                 _isNight = false;
-                ServiceLocator.Get<GameEventBus>().RaiseDawn();
+                _eventBus.RaiseDawn();
             }
         }
 
@@ -93,28 +124,9 @@ namespace HairvestMoon.Core
             TimeScale = Mathf.Max(0f, scale);
         }
 
-        public void FastForwardToHour(int targetHour)
-        {
-            while (CurrentHour != targetHour)
-            {
-                AdvanceMinute(); // or AdvanceHour() if you make that helper
-            }
-        }
-
-
-        public float GetCurrentHourProgress()
-        {
-            return (float)CurrentMinute / 60f;
-        }
+        public void FreezeTime() => isTimeFrozen = true;
+        public void ResumeTime() => isTimeFrozen = false;
 
         public string GetFormattedTime() => $"Day {Day} - {CurrentHour:00}:{CurrentMinute:00}";
-
-        public void FreezeTime() => IsTimeFrozen = true;
-        public void ResumeTime() => IsTimeFrozen = false;
-        public bool IsNight() => _isNight;
-        public bool IsMorning() => CurrentHour >= 6 && CurrentHour < 12;
-        public bool IsEvening() => CurrentHour >= 17 && CurrentHour < 20;
-
-
     }
 }

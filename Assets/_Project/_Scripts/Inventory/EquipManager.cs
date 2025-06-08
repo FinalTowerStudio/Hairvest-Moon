@@ -1,79 +1,69 @@
 using HairvestMoon.Core;
-using System.Diagnostics.Contracts;
-using UnityEngine;
+using HairvestMoon.Inventory;
 
 namespace HairvestMoon.Inventory
 {
-    public class EquipManager : MonoBehaviour, IBusListener
+    /// <summary>
+    /// Manages equip/install requests for tools and upgrades.
+    /// Ensures valid state and notifies inventory/equip systems and UI.
+    /// </summary>
+    public class EquipManager : IBusListener
     {
-        private bool isInitialized = false;
+        private BackpackEquipSystem _equipSystem;
+        private BackpackInventorySystem _backpackInventory;
+        private GameEventBus _eventBus;
+        private bool _isInitialized = false;
 
         public void RegisterBusListeners()
         {
-            var bus = ServiceLocator.Get<GameEventBus>();
-            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
         {
+            _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
+            _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
             Initialize();
+            _isInitialized = true;
         }
 
-        private void Initialize()
+        /// <summary>
+        /// Empty for now, but may need to sync state on game start.
+        /// </summary>
+        public void Initialize() { }
+
+        /// <summary>
+        /// Handles install/equip requests from the UI or gameplay.
+        /// Removes from inventory, installs in equip system, and fires UI events.
+        /// </summary>
+        public void InstallItem(ItemData item)
         {
-            SyncEquippedItemsIntoBackpackInventory();
-            isInitialized = true;
+            if (item == null) return;
+
+            // Remove from backpack inventory if present
+            bool removed = _backpackInventory.RemoveItem(item, 1);
+            if (!removed) return;
+
+            _equipSystem.EquipItem(item);
+            _eventBus?.RaiseItemInstalled(item);
+
+            // TODO: Fire analytics/event bus for "ItemEquipped"
+            // TODO: Play sound or animation for equip
         }
 
-        private void SyncEquippedItemsIntoBackpackInventory()
+        /// <summary>
+        /// Handles unequip requests (optional).
+        /// </summary>
+        public void UninstallItem(ItemData item)
         {
-            var equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
-            var backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
+            if (item == null) return;
 
-            void TryAdd(ItemData item)
-            {
-                if (item != null)
-                {
-                    if (!backpackInventory.GetAllSlots().Exists(slot => slot.item == item))
-                    {
-                        backpackInventory.AddItem(item, 1);
-                    }
-                }
-            }
+            _equipSystem.UnequipItem(item);
+            _backpackInventory.AddItem(item, 1);
+            _eventBus?.RaiseBackpackChanged();
 
-            TryAdd(equipSystem.hoeTool);
-            TryAdd(equipSystem.wateringTool);
-            TryAdd(equipSystem.seedTool);
-            TryAdd(equipSystem.harvestTool);
-            TryAdd(equipSystem.hoeUpgrade);
-            TryAdd(equipSystem.wateringUpgrade);
-            TryAdd(equipSystem.seedUpgrade);
-            TryAdd(equipSystem.harvestUpgrade);
-        }
-
-        public bool TryEquip(ItemData item)
-        {
-            if (item == null)
-                return false;
-
-            var equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
-
-            if (item.itemType == ItemType.Tool)
-            {
-                equipSystem.EquipTool(item);
-                ServiceLocator.Get<GameEventBus>().RaiseItemInstalled(item);
-                return true;
-            }
-
-            if (item.itemType == ItemType.Upgrade)
-            {
-                equipSystem.EquipUpgrade(item);
-                ServiceLocator.Get<GameEventBus>().RaiseItemInstalled(item);
-                return true;
-            }
-
-            Debug.LogWarning($"Cannot install item type: {item.itemType}");
-            return false;
+            // TODO: Fire analytics/event bus for "ItemUnequipped"
         }
     }
 }

@@ -1,57 +1,65 @@
 using HairvestMoon.Core;
-using HairvestMoon.Farming;
-using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
+using System.Collections.Generic;
 
-public class WaterVisualSystem : MonoBehaviour
+namespace HairvestMoon.Farming
 {
-    [SerializeField] private GameObject waterSliderPrefab;
-    [SerializeField] private Grid farmGrid;
-    [SerializeField] private float tileOffsetY = 1.0f;
-
-    private Dictionary<Vector3Int, WaterSliderInstance> activeSliders = new();
-    private bool isInitialized = false;
-
-    public void RegisterBusListeners()
+    /// <summary>
+    /// Displays water level sliders above watered tiles on the farm.
+    /// </summary>
+    public class WaterVisualSystem : MonoBehaviour, IBusListener, ITickable
     {
-        var bus = ServiceLocator.Get<GameEventBus>();
-        bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
-    }
+        [SerializeField] private GameObject waterSliderPrefab;
+        [SerializeField] private Grid farmGrid;
+        [SerializeField] private float tileOffsetY = 1.0f;
 
-    private void OnGlobalSystemsInitialized()
-    {
-        RefreshSliders(0, 0);
-        isInitialized = true;
-    }
+        private Dictionary<Vector3Int, WaterSliderInstance> activeSliders = new();
+        private Dictionary<Vector3Int, float> targetSliderFill = new();
+        private FarmTileDataManager _farmTileDataManager;
+        private bool isInitialized = false;
 
-    private void Update()
-    {
-        if (!isInitialized) return;
-
-        foreach (var entry in activeSliders)
+        public void RegisterBusListeners()
         {
-            var pos = entry.Key;
-            var data = ServiceLocator.Get<FarmTileDataManager>().GetTileData(pos);
-
-            float progress = data.waterMinutesRemaining / FarmTileData.MinutesPerWatering;
-            entry.Value.SetFill(Mathf.Clamp01(progress));
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            ServiceLocator.Get<GameTimeManager>().RegisterTickable(this);
         }
-    }
 
-    //This isn't being called, we need to see if this is uneccessary now, or if we are missing a call to it
-    public void RefreshSliders(int hour, int minute)
-    {
-        foreach (var entry in ServiceLocator.Get<FarmTileDataManager>().AllTileData)
+        private void OnGlobalSystemsInitialized()
         {
-            var pos = entry.Key;
-            var data = entry.Value;
+            _farmTileDataManager = ServiceLocator.Get<FarmTileDataManager>();
+            RefreshSliders();
+            isInitialized = true;
+        }
 
-            if (!data.isTilled)
+        public void Tick(GameTimeChangedArgs args)
+        {
+            foreach (var entry in activeSliders)
             {
-                RemoveSlider(pos);
-                continue;
+                var pos = entry.Key;
+                var data = _farmTileDataManager.GetTileData(pos);
+                float target = data.waterMinutesRemaining / (float)FarmTileData.MinutesPerWatering;
+                targetSliderFill[pos] = Mathf.Clamp01(target);
             }
+        }
 
+        private void Update()
+        {
+            foreach (var entry in activeSliders)
+            {
+                var pos = entry.Key;
+                var instance = entry.Value;
+
+                float current = instance.GetFill();
+                float target = targetSliderFill.TryGetValue(pos, out float t) ? t : 0f;
+                float newFill = Mathf.MoveTowards(current, target, Time.deltaTime); // interpolate
+                instance.SetFill(newFill);
+            }
+        }
+
+        public void HandleWateredTile(Vector3Int pos, FarmTileData data)
+        {
             if (data.isWatered)
             {
                 if (!activeSliders.ContainsKey(pos))
@@ -62,50 +70,63 @@ public class WaterVisualSystem : MonoBehaviour
                 RemoveSlider(pos);
             }
         }
-    }
 
-
-    public void HandleWateredTile(Vector3Int pos, FarmTileData data)
-    {
-        if (data.isWatered)
+        private void RefreshSliders()
         {
-            if (!activeSliders.ContainsKey(pos))
-                CreateSlider(pos);
-        }
-        else
-        {
-            RemoveSlider(pos);
-        }
-    }
+            foreach (var entry in _farmTileDataManager.AllTileData)
+            {
+                var pos = entry.Key;
+                var data = entry.Value;
 
-    private void CreateSlider(Vector3Int pos)
-    {
-        var worldPos = farmGrid.CellToWorld(pos) + new Vector3(0.5f, tileOffsetY, 0);
-        var instance = Instantiate(waterSliderPrefab, worldPos, Quaternion.identity, transform);
-        activeSliders[pos] = new WaterSliderInstance(instance);
-    }
+                if (!data.isTilled || !data.isWatered)
+                {
+                    RemoveSlider(pos);
+                    continue;
+                }
 
-    private void RemoveSlider(Vector3Int pos)
-    {
-        if (!activeSliders.ContainsKey(pos)) return;
-        Destroy(activeSliders[pos].gameObject);
-        activeSliders.Remove(pos);
-    }
-
-    private class WaterSliderInstance
-    {
-        public readonly GameObject gameObject;
-        private readonly UnityEngine.UI.Slider slider;
-
-        public WaterSliderInstance(GameObject obj)
-        {
-            gameObject = obj;
-            slider = obj.GetComponentInChildren<UnityEngine.UI.Slider>();
+                if (!activeSliders.ContainsKey(pos))
+                    CreateSlider(pos);
+            }
         }
 
-        public void SetFill(float fillAmount)
+        private void CreateSlider(Vector3Int pos)
         {
-            slider.value = Mathf.Clamp01(fillAmount);
+            var worldPos = farmGrid.CellToWorld(pos) + new Vector3(0.5f, tileOffsetY, 0);
+            var instance = Instantiate(waterSliderPrefab, worldPos, Quaternion.identity, transform);
+            activeSliders[pos] = new WaterSliderInstance(instance);
+        }
+
+        private void RemoveSlider(Vector3Int pos)
+        {
+            if (!activeSliders.ContainsKey(pos)) return;
+            Destroy(activeSliders[pos].gameObject);
+            activeSliders.Remove(pos);
+        }
+
+        // Optional: extend with SetColor for fancier feedback
+        private class WaterSliderInstance
+        {
+            public readonly GameObject gameObject;
+            private readonly Slider slider;
+
+            public WaterSliderInstance(GameObject obj)
+            {
+                gameObject = obj;
+                slider = obj.GetComponentInChildren<Slider>();
+            }
+
+            public void SetFill(float fillAmount)
+            {
+                slider.value = fillAmount;
+            }
+
+            public float GetFill()
+            {
+                return slider.value;
+            }
+
+            // Optional: if we want to change color based on fill
+            // public void SetColor(Color color) { /* ... */ }
         }
     }
 }

@@ -1,25 +1,14 @@
 using HairvestMoon.Player;
-using HairvestMoon.Tool;
-using HairvestMoon.UI;
 using UnityEngine;
 
 namespace HairvestMoon.Core
 {
-    // Singleton
-    // Subscribes to OnDusk and OnDawn
-    // Triggers werewolf transformation and state changes
-
-    public class GameManager : MonoBehaviour, IBusListener
+    public class GameManager : IBusListener
     {
-        [SerializeField] private GameTimeManager _timeManager;
-        [SerializeField] private PlayerStateController _playerState;
+        private PlayerStateController _playerState;
+        private GameStateManager _gameStateManager;
 
         private bool isInitialized = false;
-
-        private void OnGlobalSystemsInitialized()
-        {
-            isInitialized = true;
-        }
 
         public void RegisterBusListeners()
         {
@@ -27,17 +16,35 @@ namespace HairvestMoon.Core
             bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
             bus.OnDawn += HandleDawn;
             bus.OnDusk += HandleDusk;
+            bus.OnNewDay += HandleNewDay;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            Initialize();
+            isInitialized = true;
+        }
+
+        public void Initialize()
+        {
+            _playerState = ServiceLocator.Get<PlayerStateController>();
+            _gameStateManager = ServiceLocator.Get<GameStateManager>();
         }
 
         public void HandleDusk()
         {
-            _playerState.EnterWerewolfForm();
+            _playerState.RequestPlayerForm(PlayerStateController.PlayerForm.Werewolf);
         }
 
         public void HandleDawn()
         {
-            ServiceLocator.Get<GameStateManager>().SetState(GameState.FreeRoam);
-            _playerState.ExitWerewolfForm();
+            _gameStateManager.RequestStateChange(GameState.FreeRoam);
+            _playerState.RequestPlayerForm(PlayerStateController.PlayerForm.Human);
+        }
+
+        public void HandleNewDay()
+        {
+            // Reset quests/tasks/shops/etc at midnight.  Different than Dawn at 6am.
         }
     }
 }

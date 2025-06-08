@@ -34,7 +34,7 @@ public class SystemTemplate : MonoBehaviour, IBusListener
         // Your runtime logic here
     }
 
-    private void OnTimeChanged(TimeChangedArgs args)
+    private void OnTimeChanged(GameTimeChangedArgs args)
     {
         if (!isInitialized) return;
 

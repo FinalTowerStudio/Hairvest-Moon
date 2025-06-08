@@ -1,102 +1,124 @@
+using HairvestMoon.Core;
+using HairvestMoon.Inventory;
+using HairvestMoon.Tool;
 using System.Collections.Generic;
 using UnityEngine;
-using HairvestMoon.Inventory;
-using HairvestMoon.Farming;
-using HairvestMoon.Core;
 
 namespace HairvestMoon.UI
 {
+    /// <summary>
+    /// UI for selecting a watering can upgrade or fertilizer.
+    /// Only shows options present in the player's backpack inventory.
+    /// Highlights selected.
+    /// </summary>
     public class WateringSelectionUI : MonoBehaviour, IBusListener
     {
         [Header("UI References")]
-        [SerializeField] private GameObject waterSelectionSlotPrefab;
-        [SerializeField] private Transform gridParent;
-        [SerializeField] private FarmToolHandler farmToolHandler;
+        [SerializeField] private GameObject wateringSlotPrefab;
+        [SerializeField] private Transform wateringGridParent;
 
-        private List<UpgradeSelectionSlot> slots = new();
-        private ItemData currentSelectedWatering;
-        private CanvasGroup wateringSelectionCanvasGroup;
-
-        public void InitializeUI()
-        {
-            wateringSelectionCanvasGroup = GetComponent<CanvasGroup>();
-            BuildUI();
-        }
+        private List<SelectionSlotUI> slots = new();
+        private ItemData _currentSelectedItem;
+        private CanvasGroup _canvasGroup;
+        private BackpackInventorySystem _backpackInventory;
+        private BackpackEquipSystem _equipSystem;
 
         public void RegisterBusListeners()
         {
             var bus = ServiceLocator.Get<GameEventBus>();
             bus.BackpackChanged += RefreshUI;
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
-        public void OpenWateringMenu()
+        private void OnGlobalSystemsInitialized()
         {
-            gameObject.SetActive(true);
+            _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
+            _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
+            _canvasGroup = GetComponent<CanvasGroup>();
             BuildUI();
-            wateringSelectionCanvasGroup.alpha = 1f;
-            wateringSelectionCanvasGroup.interactable = true;
-            wateringSelectionCanvasGroup.blocksRaycasts = true;
         }
 
-        public void CloseWateringMenu()
-        {
-            wateringSelectionCanvasGroup.alpha = 0f;
-            wateringSelectionCanvasGroup.interactable = false;
-            wateringSelectionCanvasGroup.blocksRaycasts = false;
-        }
-
+        /// <summary>
+        /// Builds the selection grid for watering upgrades/fertilizers owned.
+        /// </summary>
         private void BuildUI()
         {
-            foreach (Transform child in gridParent)
+            foreach (Transform child in wateringGridParent)
                 Destroy(child.gameObject);
+
             slots.Clear();
+            List<ItemData> wateringOptions = new();
 
-            // Always add Normal Water option first
-            var slotGO = Instantiate(waterSelectionSlotPrefab, gridParent);
-            var slotUI = slotGO.GetComponent<UpgradeSelectionSlot>();
-            slotUI.Initialize(null, OnWateringOptionSelected);
-            slotUI.SetSelected(currentSelectedWatering == null);
-            slots.Add(slotUI);
-
-            // If we have a Fertilizer Sprayer equipped, enable fertilizer selection
-            var wateringUpgrade = ServiceLocator.Get<BackpackEquipSystem>().wateringUpgrade;
-            if (wateringUpgrade != null)
+            foreach (var slot in _backpackInventory.Slots)
             {
-                var allBackpackSlots = ServiceLocator.Get<BackpackInventorySystem>().GetAllSlots();
-
-                foreach (var slot in allBackpackSlots)
-                {
-                    if (slot.item.itemType == ItemType.Fertilizer)
-                    {
-                        var fertSlotGO = Instantiate(waterSelectionSlotPrefab, gridParent);
-                        var fertSlotUI = fertSlotGO.GetComponent<UpgradeSelectionSlot>();
-                        fertSlotUI.Initialize(slot.item, OnWateringOptionSelected);
-                        fertSlotUI.SetSelected(slot.item == currentSelectedWatering);
-                        slots.Add(fertSlotUI);
-                    }
-                }
+                if (slot.Item != null && IsWateringOption(slot.Item))
+                    wateringOptions.Add(slot.Item);
             }
+
+            if (wateringOptions.Count == 0)
+            {
+                _currentSelectedItem = null;
+                return;
+            }
+
+            foreach (var item in wateringOptions)
+            {
+                var slotGO = Instantiate(wateringSlotPrefab, wateringGridParent);
+                var slotUI = slotGO.GetComponent<SelectionSlotUI>();
+                slotUI.Initialize(item, OnWateringSelected);
+                slotUI.SetSelected(item == _currentSelectedItem);
+                slots.Add(slotUI);
+            }
+
+            if (_currentSelectedItem == null)
+                OnWateringSelected(wateringOptions[0]);
         }
+
+        /// <summary>
+        /// Define what counts as a watering option (upgrade, fertilizer, etc).
+        /// Adjust as needed for your game’s logic.
+        /// </summary>
+        private bool IsWateringOption(ItemData item)
+        {
+            // Could check itemType == Upgrade && toolType == WateringCan
+            // Or check for fertilizer tags—expand as your design requires
+            return item.itemType == ItemType.Upgrade && item.toolType == ToolType.WateringCan;
+        }
+
+        private void OnWateringSelected(ItemData selectedItem)
+        {
+            _currentSelectedItem = selectedItem;
+            foreach (var slot in slots)
+                slot.SetSelected(slot.Item == _currentSelectedItem);
+
+            // Optionally: Call a system to actually "use" the selection
+        }
+
+        public ItemData GetCurrentSelectedItem() => _currentSelectedItem;
 
         private void RefreshUI()
         {
             BuildUI();
         }
 
-        private void OnWateringOptionSelected(ItemData selectedItem)
+        public void OpenWateringMenu()
         {
-            currentSelectedWatering = selectedItem;
-            //farmToolHandler.SetSelectedWateringOption(selectedItem);  // We'll wire this into actual logic later
-
-            foreach (var slot in slots)
-            {
-                slot.SetSelected(slot.Item == currentSelectedWatering);
-            }
+            gameObject.SetActive(true);
+            BuildUI();
+            SetCanvasVisible(true);
         }
 
-        public ItemData GetCurrentSelectedItem()
+        public void CloseWateringMenu()
         {
-            return currentSelectedWatering;
+            SetCanvasVisible(false);
+        }
+
+        private void SetCanvasVisible(bool visible)
+        {
+            if (_canvasGroup == null) _canvasGroup = GetComponent<CanvasGroup>();
+            _canvasGroup.alpha = visible ? 1f : 0f;
+            _canvasGroup.interactable = visible;
+            _canvasGroup.blocksRaycasts = visible;
         }
     }
 }

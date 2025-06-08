@@ -1,13 +1,12 @@
 using HairvestMoon.Core;
-using HairvestMoon.Farming;
-using HairvestMoon.Inventory;
 using HairvestMoon.Player;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using System.Collections.Generic;
+
 namespace HairvestMoon.Interaction
 {
-    public class TileTargetingSystem : MonoBehaviour
+    public class TileTargetingSystem : MonoBehaviour, IBusListener
     {
         [Header("References")]
         public Grid Grid;
@@ -25,24 +24,29 @@ namespace HairvestMoon.Interaction
         public Vector3Int? CurrentTargetedTile => _currentTargetedTile;
         private Vector3Int? _currentTargetedTile;
         private Vector3Int _lastHighlighted;
+        private bool isInitialized = false;
+
+        public void RegisterBusListeners()
+        {
+            ServiceLocator.Get<GameEventBus>().GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+        }
+
+        private void OnGlobalSystemsInitialized()
+        {
+            isInitialized = true;
+        }
 
         private void Update()
         {
+            if (!isInitialized) return;
+
             Vector3 footPos = ServiceLocator.Get<Player_Controller>().Position + new Vector3(0, footPositionYOffset, 0);
             Vector3Int playerCell = Grid.WorldToCell(footPos);
 
-            Vector3Int? targetTile = null;
+            Vector3Int? targetTile = ServiceLocator.Get<InputController>().CurrentMode == ControlMode.Mouse
+                ? GetMouseTargetTile(playerCell, footPos)
+                : GetArcTargetTile(playerCell, footPos);
 
-            if (ServiceLocator.Get<InputController>().CurrentMode == ControlMode.Mouse)
-            {
-                targetTile = GetMouseTargetTile(playerCell, footPos);
-            }
-            else
-            {
-                targetTile = GetArcTargetTile(playerCell, footPos);
-            }
-
-            // Clear last
             if (_lastHighlighted != null)
                 selectionHighlightTilemap.SetTile(_lastHighlighted, null);
 
@@ -60,9 +64,6 @@ namespace HairvestMoon.Interaction
 
         private Vector3Int? GetMouseTargetTile(Vector3Int playerCell, Vector3 worldPos)
         {
-            if (Camera.main == null || UnityEngine.InputSystem.Mouse.current == null)
-                return null;
-
             Vector3 mouseWorld = Camera.main.ScreenToWorldPoint(UnityEngine.InputSystem.Mouse.current.position.ReadValue());
             mouseWorld.z = 0;
             Vector3Int cursorCell = Grid.WorldToCell(mouseWorld);
@@ -71,7 +72,7 @@ namespace HairvestMoon.Interaction
             if (Mathf.Abs(offset.x) <= 1 && Mathf.Abs(offset.y) <= 1)
             {
                 float dist = Vector3.Distance(Grid.GetCellCenterWorld(cursorCell), worldPos);
-                if (dist <= mouseTargetMaxDistance && ServiceLocator.Get<FarmTileDataManager>().IsTileTillable(cursorCell))
+                if (dist <= mouseTargetMaxDistance)
                     return cursorCell;
             }
             return null;
@@ -87,8 +88,6 @@ namespace HairvestMoon.Interaction
 
             foreach (var cell in arcTiles)
             {
-                if (!ServiceLocator.Get<FarmTileDataManager>().IsTileTillable(cell)) continue;
-
                 float dist = Vector3.Distance(Grid.GetCellCenterWorld(cell), originWorld);
                 if (dist < bestScore)
                 {
@@ -118,21 +117,6 @@ namespace HairvestMoon.Interaction
                 }
             }
             return result;
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            if (!drawDebugGizmos || Grid == null || !Application.isPlaying) return;
-
-            Gizmos.color = gizmoColor;
-            Vector3 footPos = ServiceLocator.Get<Player_Controller>().Position + new Vector3(0, footPositionYOffset, 0);
-            Vector3Int playerCell = Grid.WorldToCell(footPos);
-            var arc = GetArcTiles(playerCell, ServiceLocator.Get<PlayerFacingController>().CurrentFacing);
-            foreach (var cell in arc)
-            {
-                Vector3 world = Grid.GetCellCenterWorld(cell);
-                Gizmos.DrawCube(world, Grid.cellSize * 0.8f);
-            }
         }
     }
 }
