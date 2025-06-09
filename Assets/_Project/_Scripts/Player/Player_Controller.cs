@@ -8,42 +8,41 @@ namespace HairvestMoon.Player
     {
         public Vector3 Position => transform.position;
 
-        [Header("Dependencies")]
+        [Header("Physics")]
         [SerializeField] private Rigidbody2D _rb;
 
-        private bool _isInitialized = false;
-        private bool _canMove = true;
-        private bool _isFrozen = false; // For cutscenes, menus, etc.
-        private Vector2 _moveDir = Vector2.zero;
+        // Cached managers
         private PlayerFacingController _facingController;
         private PlayerStateController _stateController;
         private InputController _inputController;
         private GameEventBus _eventBus;
 
+        // Animation, movement, state
+        private bool _isInitialized = false;
+        private bool _canMove = true;
+        private bool _isFrozen = false; // Used for cutscenes/menus
+        private Vector2 _moveDir = Vector2.zero;
+
+        // Stamina (example stat for Tick logic)
         private int _stamina = 100;
         private const int MaxStamina = 100;
 
+        // Animation and rendering
         private Animator _animator => ServiceLocator.Get<PlayerStateController>().CurrentAnimator;
         private SpriteRenderer _spriteRenderer => ServiceLocator.Get<PlayerStateController>().CurrentSpriteRenderer;
         private float MoveSpeed => ServiceLocator.Get<PlayerStateController>().MoveSpeed;
 
         private int _currentAnimHash = 0;
 
-        // Anim hashes
-        private readonly int _animeIdleSide = Animator.StringToHash("AN_Character_Farmer_Idle_Side");
-        private readonly int _animeIdleUp = Animator.StringToHash("AN_Character_Farmer_Idle_Up");
-        private readonly int _animeIdleDown = Animator.StringToHash("AN_Character_Farmer_Idle_Down");
-        private readonly int _animeMoveSide = Animator.StringToHash("AN_Character_Farmer_Walk_Side");
-        private readonly int _animeMoveUp = Animator.StringToHash("AN_Character_Farmer_Walk_Up");
-        private readonly int _animeMoveDown = Animator.StringToHash("AN_Character_Farmer_Walk_Down");
+        // Animation hash cache
+        private static readonly int _animeIdleSide = Animator.StringToHash("AN_Character_Farmer_Idle_Side");
+        private static readonly int _animeIdleUp = Animator.StringToHash("AN_Character_Farmer_Idle_Up");
+        private static readonly int _animeIdleDown = Animator.StringToHash("AN_Character_Farmer_Idle_Down");
+        private static readonly int _animeMoveSide = Animator.StringToHash("AN_Character_Farmer_Walk_Side");
+        private static readonly int _animeMoveUp = Animator.StringToHash("AN_Character_Farmer_Walk_Up");
+        private static readonly int _animeMoveDown = Animator.StringToHash("AN_Character_Farmer_Walk_Down");
 
-        public void Initialize()
-        {
-            _facingController = ServiceLocator.Get<PlayerFacingController>();
-            _stateController = ServiceLocator.Get<PlayerStateController>();
-            _inputController = ServiceLocator.Get<InputController>();
-            _isInitialized = true;
-        }
+        // --- Initialization and System Wiring ---
 
         public void RegisterBusListeners()
         {
@@ -56,17 +55,23 @@ namespace HairvestMoon.Player
 
         private void OnGlobalSystemsInitialized()
         {
-            Initialize();
+            _facingController = ServiceLocator.Get<PlayerFacingController>();
+            _stateController = ServiceLocator.Get<PlayerStateController>();
+            _inputController = ServiceLocator.Get<InputController>();
+
+            _isInitialized = true;
             ServiceLocator.Get<GameTimeManager>().RegisterTickable(this);
         }
 
+        // --- Core Update Cycle ---
+
         public void Tick(GameTimeChangedArgs args)
         {
-            // Example: Drain stamina (expand as needed)
             if (_stamina > 0)
             {
                 _stamina = Mathf.Max(0, _stamina - 1);
-                // Fire stamina update event, trigger low stamina, etc.
+                Debug.Log($"[Player_Controller] Stamina updated: {_stamina}/{MaxStamina}");
+                // TODO: Raise event for stamina update/UI if needed
             }
         }
 
@@ -98,16 +103,26 @@ namespace HairvestMoon.Player
             }
         }
 
+        // --- Event Handling ---
+
         private void OnGameStateChanged(GameStateChangedArgs args)
         {
             var newState = args.State;
             _canMove = newState == GameState.FreeRoam;
-            _isFrozen = newState == GameState.Paused || newState == GameState.Cutscene || newState == GameState.Dialogue;
+            _isFrozen = (newState == GameState.Paused || newState == GameState.Cutscene || newState == GameState.Dialogue);
         }
 
-        private void OnControlModeChanged(ControlModeChangedArgs args) { /* Add feedback if needed */ }
+        private void OnControlModeChanged(ControlModeChangedArgs args)
+        {
+            // TODO: Visual feedback for switching controller/mouse if desired
+        }
 
-        private void OnLookInputDetected() { /* Optional: additional facing/feedback logic */ }
+        private void OnLookInputDetected()
+        {
+            // Optional: Haptic feedback, aim highlight, etc.
+        }
+
+        // --- Animation Logic ---
 
         private void UpdateAnimation(PlayerFacingController.FacingDirection facing)
         {
@@ -139,5 +154,12 @@ namespace HairvestMoon.Player
                 _currentAnimHash = anim;
             }
         }
+
+        // --- Expansion Points ---
+
+        // public void FreezePlayer(bool freeze) { _isFrozen = freeze; }
+        // public void RestoreStamina() { _stamina = MaxStamina; }
+        // public void OnPlayerDamaged() { /* Add event logic */ }
+        // public void OnItemPickup(ItemData item) { /* Add event logic */ }
     }
 }
