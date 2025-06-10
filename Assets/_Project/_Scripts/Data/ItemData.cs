@@ -14,5 +14,6 @@ namespace HairvestMoon
         public ItemType itemType;
         public ToolType toolType;
         public int sellPrice;
+        public int maxStack = 99;
     }
 }

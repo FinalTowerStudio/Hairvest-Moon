@@ -5,14 +5,9 @@ namespace HairvestMoon.Inventory
     public class BackpackUpgradeManager : IBusListener
     {
         private bool isInitialized = false;
-
-        private const int baseSlots = 10;
-        private int extraSlots = 20;
         private const int slotsPerUpgrade = 2;
 
         public int SlotsPerUpgrade => slotsPerUpgrade;
-        public int BaseSlots => baseSlots;
-        public int GetCurrentSlots() => baseSlots + (extraSlots * slotsPerUpgrade);
 
         public void RegisterBusListeners()
         {
@@ -27,13 +22,12 @@ namespace HairvestMoon.Inventory
 
         public void Initialize()
         {
-            extraSlots = 20;
+            // Placeholder
         }
 
         public void ApplyBackpackUpgrade()
         {
-            extraSlots++;
-            ServiceLocator.Get<GameEventBus>().RaiseBackpackChanged();
+            ServiceLocator.Get<BackpackInventorySystem>().UnlockSlots(slotsPerUpgrade);
         }
     }
 }

@@ -6,16 +6,21 @@ using static HairvestMoon.Player.PlayerStateController;
 
 namespace HairvestMoon.Core
 {
+    /// <summary>
+    /// Central event bus for all global game events. 
+    /// Use strongly-typed argument classes for safety and clarity.
+    /// No direct cross-system calls—everything routes through here or ServiceLocator.
+    /// </summary>
     public class GameEventBus
     {
-        // Inventory Events
+        // --- Inventory Events ---
         public event Action InventoryChanged;
         public void RaiseInventoryChanged() => InventoryChanged?.Invoke();
 
         public event Action BackpackChanged;
         public void RaiseBackpackChanged() => BackpackChanged?.Invoke();
 
-        // Time Events
+        // --- Time Events ---
         public event Action<GameTimeChangedArgs> TimeChanged;
         public void RaiseTimeChanged(GameTimeChangedArgs args)
             => TimeChanged?.Invoke(args);
@@ -29,7 +34,7 @@ namespace HairvestMoon.Core
         public event Action OnNewDay;
         public void RaiseNewDay() => OnNewDay?.Invoke();
 
-        // Game State Events
+        // --- Game State Events ---
         public event Action<GameStateChangedArgs> GameStateChanged;
         public void RaiseGameStateChanged(GameState state)
             => GameStateChanged?.Invoke(new GameStateChangedArgs(state));
@@ -38,7 +43,7 @@ namespace HairvestMoon.Core
         public void RaiseInputLockChanged(bool locked)
             => InputLockChanged?.Invoke(new InputLockChangedArgs(locked));
 
-        // Input Controller Events
+        // --- Input Controller Events ---
         public event Action MenuToggle;
         public void RaiseMenuToggle() => MenuToggle?.Invoke();
 
@@ -55,7 +60,7 @@ namespace HairvestMoon.Core
         public event Action LookInputDetected;
         public void RaiseLookInputDetected() => LookInputDetected?.Invoke();
 
-        // Farming Tile Events
+        // --- Farming/Player Events ---
         public event Action<Vector3Int> TileTilled;
         public void RaiseTileTilled(Vector3Int pos) => TileTilled?.Invoke(pos);
 
@@ -66,29 +71,39 @@ namespace HairvestMoon.Core
         public void RaisePlayerFormChanged(PlayerForm newForm)
             => PlayerFormChanged?.Invoke(new PlayerFormChangedArgs(newForm));
 
-        // Inventory Install Event
+        // --- Equip/Install Events ---
         public event Action<ItemInstalledEventArgs> ItemInstalled;
-
         public void RaiseItemInstalled(ItemData item)
         {
             ItemInstalled?.Invoke(new ItemInstalledEventArgs(item));
         }
 
+        // --- System Events ---
         public event Action GlobalSystemsInitialized;
         public void RaiseGlobalSystemsInitialized()
         {
             GlobalSystemsInitialized?.Invoke();
         }
 
+        // --- Tool/Hotbar Events ---
         public event Action<ToolType> ToolChanged;
         public void RaiseToolChanged(ToolType tool) => ToolChanged?.Invoke(tool);
 
+        // --- Player Facing Event ---
+        public event Action<PlayerFacingController.FacingDirection> FacingChanged;
+        public void RaiseFacingChanged(PlayerFacingController.FacingDirection dir)
+        {
+            FacingChanged?.Invoke(dir);
+        }
+
+        // --- Expand with more events as needed (e.g., PlayerDamaged, CropHarvested, etc.) ---
     }
+
+    // --- Event Argument Classes ---
 
     public class ItemInstalledEventArgs
     {
         public ItemData InstalledItem { get; }
-
         public ItemInstalledEventArgs(ItemData installedItem)
         {
             InstalledItem = installedItem;
@@ -98,37 +113,25 @@ namespace HairvestMoon.Core
     public class GameStateChangedArgs
     {
         public GameState State { get; set; }
-        public GameStateChangedArgs(GameState state)
-        {
-            State = state;
-        }
+        public GameStateChangedArgs(GameState state) { State = state; }
     }
 
     public class InputLockChangedArgs
     {
         public bool Locked { get; set; }
-        public InputLockChangedArgs(bool locked)
-        {
-            Locked = locked;
-        }
+        public InputLockChangedArgs(bool locked) { Locked = locked; }
     }
 
     public class ControlModeChangedArgs
     {
         public ControlMode Mode { get; set; }
-        public ControlModeChangedArgs(ControlMode mode)
-        {
-            Mode = mode;
-        }
+        public ControlModeChangedArgs(ControlMode mode) { Mode = mode; }
     }
 
     public class PlayerFormChangedArgs
     {
         public PlayerStateController.PlayerForm Form { get; set; }
-        public PlayerFormChangedArgs(PlayerStateController.PlayerForm form)
-        {
-            Form = form;
-        }
+        public PlayerFormChangedArgs(PlayerStateController.PlayerForm form) { Form = form; }
     }
 
     public class GameTimeChangedArgs
@@ -136,12 +139,9 @@ namespace HairvestMoon.Core
         public int Hour { get; }
         public int Minute { get; }
         public int Day { get; }
-
         public GameTimeChangedArgs(int hour, int minute, int day)
         {
-            Hour = hour;
-            Minute = minute;
-            Day = day;
+            Hour = hour; Minute = minute; Day = day;
         }
     }
 }

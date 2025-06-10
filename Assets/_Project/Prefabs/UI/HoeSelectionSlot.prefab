@@ -180,9 +180,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   iconImage: {fileID: 3351862502482685928}
-  highlightImage: {fileID: 7676431249230250625}
-  selectButton: {fileID: 6114039960314976012}
-  defaultNormalSprite: {fileID: 2626216719061117901, guid: 5f5b7ac0c414f9d4aa8abbd1cf97fe31, type: 3}
+  highlightObj: {fileID: 1997504577269984951}
+  button: {fileID: 6114039960314976012}
 --- !u!1 &8855418130551454299
 GameObject:
   m_ObjectHideFlags: 0

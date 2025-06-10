@@ -1,27 +1,34 @@
 ﻿using HairvestMoon.Core;
 using UnityEngine;
+using System;
 
 namespace HairvestMoon.Player
 {
     /// <summary>
     /// Determines the player's current facing direction based on movement or look input.
-    /// Prioritizes movement, and defers to look input only after intentional use.
+    /// Publishes an event on the GameEventBus whenever facing changes.
     /// </summary>
-    public class PlayerFacingController : MonoBehaviour, IBusListener
+    public class PlayerFacingController : IBusListener
     {
         public enum FacingDirection { Up, Down, Left, Right }
-        public FacingDirection CurrentFacing { get; private set; } = FacingDirection.Right;
+
+        private FacingDirection _currentFacing = FacingDirection.Right;
+        public FacingDirection CurrentFacing => _currentFacing;
 
         private FacingDirection _lastMoveFacing = FacingDirection.Right;
-        private FacingSource _currentSource = FacingSource.Movement;
+        private bool _isInLookMode = false;
+        private float _lookStickyTimer = 0f;
+        private const float LookStickyTime = 0.18f;
 
+        // Dependencies
         private InputController _inputController;
+        private GameEventBus _eventBus;
         private bool _isInitialized = false;
 
-        // --- System Initialization ---
         public void RegisterBusListeners()
         {
-            ServiceLocator.Get<GameEventBus>().GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            _eventBus = ServiceLocator.Get<GameEventBus>();
+            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
         }
 
         private void OnGlobalSystemsInitialized()
@@ -31,62 +38,70 @@ namespace HairvestMoon.Player
         }
 
         /// <summary>
-        /// Updates the facing direction each frame based on input and control mode.
-        /// Should be called by Player_Controller in Update().
+        /// Updates facing each frame. Stays in look direction until player actually moves.
+        /// Publishes to the event bus if facing changes.
         /// </summary>
-        public void UpdateFacing(Vector2 moveInput, Vector2 lookInput, ControlMode mode)
+        public void UpdateFacing(Vector2 moveInput, Vector2 lookInput, ControlMode mode, Vector2 playerPosition)
         {
             if (!_isInitialized) return;
 
             bool isMoving = moveInput.sqrMagnitude > 0.01f;
             bool lookInputActive = _inputController != null && _inputController.LookInputThisFrame;
+            bool lookInputHeld = lookInput.sqrMagnitude > 0.1f;
+
+            FacingDirection newFacing = _currentFacing;
 
             if (isMoving)
             {
-                _currentSource = FacingSource.Movement;
-                CurrentFacing = FromVector(moveInput);
-                _lastMoveFacing = CurrentFacing;
-                return;
+                _isInLookMode = false;
+                _lookStickyTimer = 0f;
+                newFacing = FromVector(moveInput);
+                _lastMoveFacing = newFacing;
             }
-
-            if (_currentSource == FacingSource.Movement && lookInputActive)
-                _currentSource = FacingSource.Look;
-
-            if (_currentSource == FacingSource.Look && lookInputActive)
+            else if (lookInputHeld || lookInputActive)
             {
-                Vector2 direction;
-                if (mode == ControlMode.Mouse)
-                {
-                    Vector2 worldMouse = Camera.main.ScreenToWorldPoint(lookInput);
-                    direction = worldMouse - (Vector2)transform.position;
-                }
-                else
-                {
-                    direction = lookInput;
-                }
-
-                if (direction.sqrMagnitude > 0.01f)
-                    CurrentFacing = FromVector(direction);
+                _isInLookMode = true;
+                _lookStickyTimer = LookStickyTime;
+                Vector2 dir = (mode == ControlMode.Mouse)
+                    ? ((Vector2)Camera.main.ScreenToWorldPoint(lookInput) - playerPosition)
+                    : lookInput;
+                if (dir.sqrMagnitude > 0.01f)
+                    newFacing = FromVector(dir);
+            }
+            else if (_isInLookMode && _lookStickyTimer > 0f)
+            {
+                _lookStickyTimer -= Time.deltaTime;
+                // Keep facing as is during sticky look
             }
             else
             {
-                CurrentFacing = _lastMoveFacing;
+                _isInLookMode = false;
+                newFacing = _lastMoveFacing;
+            }
+
+            // If facing actually changed, update and publish to the event bus
+            if (newFacing != _currentFacing)
+            {
+                _currentFacing = newFacing;
+                _eventBus?.RaiseFacingChanged(_currentFacing);
             }
         }
 
         /// <summary>
-        /// Instantly set the player's facing for cutscenes, scripted events, etc.
+        /// Forces the player's facing for scripted/cutscene use.
         /// </summary>
         public void ForceFacing(FacingDirection direction)
         {
-            CurrentFacing = direction;
+            if (_currentFacing != direction)
+            {
+                _currentFacing = direction;
+                _eventBus?.RaiseFacingChanged(_currentFacing);
+            }
             _lastMoveFacing = direction;
-            _currentSource = FacingSource.Movement;
+            _isInLookMode = false;
+            _lookStickyTimer = 0f;
         }
 
-        /// <summary>
-        /// Converts a vector2 to one of the four cardinal facings.
-        /// </summary>
         private FacingDirection FromVector(Vector2 input)
         {
             if (Mathf.Abs(input.x) > Mathf.Abs(input.y))
@@ -95,12 +110,9 @@ namespace HairvestMoon.Player
                 return input.y > 0 ? FacingDirection.Up : FacingDirection.Down;
         }
 
-        /// <summary>
-        /// Gets an integer grid offset for use in target selection or interactions.
-        /// </summary>
         public Vector3Int GetFacingOffset()
         {
-            return CurrentFacing switch
+            return _currentFacing switch
             {
                 FacingDirection.Up => Vector3Int.up,
                 FacingDirection.Down => Vector3Int.down,
@@ -108,12 +120,6 @@ namespace HairvestMoon.Player
                 FacingDirection.Right => Vector3Int.right,
                 _ => Vector3Int.zero
             };
-        }
-
-        private enum FacingSource
-        {
-            Movement,
-            Look
         }
     }
 }

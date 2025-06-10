@@ -2,6 +2,7 @@
 using UnityEngine.UI;
 using HairvestMoon.Inventory;
 using HairvestMoon.Core;
+using TMPro;
 
 namespace HairvestMoon.UI
 {
@@ -12,10 +13,11 @@ namespace HairvestMoon.UI
     public class InventorySlotUI : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private Image iconImage;
-        [SerializeField] private Text quantityText;
-        [SerializeField] private GameObject highlightObj;
-        [SerializeField] private Button button;
+        [SerializeField] private Image _iconImage;
+        [SerializeField] private TextMeshProUGUI _quantityText;
+        [SerializeField] private TextMeshProUGUI _nameText;
+        [SerializeField] private GameObject _highlightObj;
+        [SerializeField] private Button _button;
 
         public ItemData Item { get; private set; }
 
@@ -25,12 +27,12 @@ namespace HairvestMoon.UI
         public void Initialize(ItemData item, System.Action<ItemData> onSelected = null)
         {
             Item = item;
-            iconImage.sprite = item ? item.itemIcon : null;
-            highlightObj.SetActive(false);
+            _iconImage.sprite = item ? item.itemIcon : null;
+            _highlightObj.SetActive(false);
 
-            button.onClick.RemoveAllListeners();
+            _button.onClick.RemoveAllListeners();
             if (onSelected != null)
-                button.onClick.AddListener(() => onSelected(Item));
+                _button.onClick.AddListener(() => onSelected(Item));
         }
 
         /// <summary>
@@ -41,12 +43,14 @@ namespace HairvestMoon.UI
             int qty = 0;
             if (Item != null)
                 qty = ServiceLocator.Get<ResourceInventorySystem>().GetQuantity(Item);
-            quantityText.text = qty > 1 ? qty.ToString() : "";
+            _quantityText.text = qty > 1 ? qty.ToString() : "";
+            _nameText.text = Item != null ? Item.itemName : "";
+
         }
 
         public void SetSelected(bool selected)
         {
-            highlightObj.SetActive(selected);
+            _highlightObj.SetActive(selected);
         }
 
         public void OnPointerEnter()

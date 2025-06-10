@@ -6,33 +6,47 @@ using UnityEngine.UI;
 namespace HairvestMoon.UI
 {
     /// <summary>
-    /// Shows fill bar for backpack capacity, updates on inventory change.
+    /// Shows fill bar for backpack capacity: filled unlocked slots / unlocked slots.
+    /// Updates in response to backpack changes.
     /// </summary>
     public class BackpackCapacityBarUI : MonoBehaviour, IBusListener
     {
         [SerializeField] private Image fillImage;
 
         private BackpackInventorySystem _backpackInventory;
-        private BackpackUpgradeManager _upgradeManager;
 
         public void InitializeUI()
         {
             _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
-            _upgradeManager = ServiceLocator.Get<BackpackUpgradeManager>();
-            Refresh();
         }
 
         public void RegisterBusListeners()
         {
             var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
             bus.BackpackChanged += Refresh;
         }
 
+        private void OnGlobalSystemsInitialized()
+        {
+            Refresh();
+        }
+
+        /// <summary>
+        /// Updates fill amount: filled unlocked slots divided by unlocked slots.
+        /// </summary>
         private void Refresh()
         {
-            int current = _backpackInventory?.Slots.Count ?? 0;
-            int total = _upgradeManager?.GetCurrentSlots() ?? 1;
-            float fillAmount = (total > 0) ? (float)current / total : 0f;
+            if (_backpackInventory == null) return;
+            int unlocked = _backpackInventory.UnlockedSlots;
+            int filled = 0;
+            var slots = _backpackInventory.Slots;
+            for (int i = 0; i < unlocked; i++)
+            {
+                if (slots[i].Item != null)
+                    filled++;
+            }
+            float fillAmount = (unlocked > 0) ? (float)filled / unlocked : 0f;
             fillImage.fillAmount = fillAmount;
         }
     }

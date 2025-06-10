@@ -255,6 +255,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   iconImage: {fileID: 4719403460905755963}
-  highlightImage: {fileID: 2515275294260919852}
-  selectButton: {fileID: 7718693411956335515}
-  defaultNormalSprite: {fileID: 5827638716017627413, guid: 69986b7f6e92c6c42ae3c440a0777704, type: 3}
+  highlightObj: {fileID: 6537563905521758625}
+  button: {fileID: 7718693411956335515}

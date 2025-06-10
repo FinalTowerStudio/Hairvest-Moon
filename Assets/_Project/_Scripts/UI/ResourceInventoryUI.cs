@@ -20,18 +20,26 @@ public class ResourceInventoryUI : MonoBehaviour, IBusListener
     private SeedDatabase _seedDatabase;
     private ResourceInventorySystem _resourceInventory;
 
+    private InventorySlotUI _selectedSlot = null;
+
     public void InitializeUI()
     {
         _seedDatabase = ServiceLocator.Get<SeedDatabase>();
         _resourceInventory = ServiceLocator.Get<ResourceInventorySystem>();
-        BuildUI();
-        RefreshUI();
+        // Do not call BuildUI or RefreshUI here
     }
 
     public void RegisterBusListeners()
     {
         var bus = ServiceLocator.Get<GameEventBus>();
         bus.InventoryChanged += RefreshUI;
+        bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+    }
+
+    private void OnGlobalSystemsInitialized()
+    {
+        BuildUI();
+        RefreshUI();
     }
 
     /// <summary>
@@ -49,7 +57,7 @@ public class ResourceInventoryUI : MonoBehaviour, IBusListener
             var item = seedData.seedItem;
             var slotGO = Instantiate(inventorySlotPrefab, seedGridParent);
             var slot = slotGO.GetComponent<InventorySlotUI>();
-            slot.Initialize(item);
+            slot.Initialize(item, OnSlotSelected);
             seedSlots[item] = slot;
         }
 
@@ -65,6 +73,21 @@ public class ResourceInventoryUI : MonoBehaviour, IBusListener
             var slot = slotGO.GetComponent<InventorySlotUI>();
             slot.Initialize(item);
             cropSlots[item] = slot;
+        }
+    }
+
+    private void OnSlotSelected(ItemData item)
+    {
+        // Deselect old slot
+        if (_selectedSlot != null)
+            _selectedSlot.SetSelected(false);
+
+        // Find the newly selected slot
+        if (seedSlots.TryGetValue(item, out var slot) || cropSlots.TryGetValue(item, out slot))
+        {
+            _selectedSlot = slot;
+            slot.SetSelected(true);
+            // (Optionally) Show price or enable "Sell" button here.
         }
     }
 

@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using HairvestMoon.Inventory;
+using TMPro;
 
 namespace HairvestMoon.UI
 {
@@ -11,10 +11,11 @@ namespace HairvestMoon.UI
     public class BackpackSlotUI : MonoBehaviour
     {
         [Header("UI References")]
-        [SerializeField] private Image iconImage;
-        [SerializeField] private Text stackText;
-        [SerializeField] private GameObject highlightObj;
-        [SerializeField] private Button button;
+        [SerializeField] private Image _iconImage;
+        [SerializeField] private TextMeshProUGUI _stackText;
+        [SerializeField] private GameObject _highlightObj;
+        [SerializeField] private GameObject _lockOverlay;
+        [SerializeField] private Button _button;
 
         public ItemData Item { get; private set; }
         private int _stack;
@@ -29,12 +30,15 @@ namespace HairvestMoon.UI
             _stack = stack;
             _onSelected = onSelected;
 
-            iconImage.sprite = item ? item.itemIcon : null;
-            stackText.text = stack > 1 ? stack.ToString() : "";
-            highlightObj.SetActive(false);
+            _iconImage.sprite = item ? item.itemIcon : null;
+            _iconImage.enabled = item != null;
+            _stackText.text = stack > 1 ? stack.ToString() : "";
+            _stackText.enabled = item != null && stack > 1;
+            _highlightObj.SetActive(false);
 
-            button.onClick.RemoveAllListeners();
-            button.onClick.AddListener(OnClicked);
+            _button.onClick.RemoveAllListeners();
+            if (onSelected != null && item != null)
+                _button.onClick.AddListener(OnClicked);
         }
 
         private void OnClicked()
@@ -47,7 +51,7 @@ namespace HairvestMoon.UI
         /// </summary>
         public void SetSelected(bool selected)
         {
-            highlightObj.SetActive(selected);
+            _highlightObj.SetActive(selected);
         }
 
         public void OnPointerEnter()
@@ -55,9 +59,25 @@ namespace HairvestMoon.UI
             if (Item != null)
                 SelectionTooltipUI.Show(Item);
         }
+
         public void OnPointerExit()
         {
             SelectionTooltipUI.Hide();
+        }
+
+        /// <summary>
+        /// Locks or unlocks the slot visually and functionally.
+        /// </summary>
+        public void SetLocked(bool locked)
+        {
+            _lockOverlay.SetActive(locked);
+            _button.interactable = !locked;
+            // Also clear visuals if locked:
+            if (locked)
+            {
+                _iconImage.enabled = false;
+                _stackText.enabled = false;
+            }
         }
     }
 }

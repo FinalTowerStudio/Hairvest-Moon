@@ -179,7 +179,7 @@ GameObject:
   - component: {fileID: 6201331841071378330}
   - component: {fileID: 8228591769575762363}
   m_Layer: 0
-  m_Name: ItemImage
+  m_Name: LockOverlay
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

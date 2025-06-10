@@ -1,6 +1,6 @@
 using HairvestMoon.Core;
-using HairvestMoon.Inventory;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace HairvestMoon.Inventory
 {
@@ -11,6 +11,10 @@ namespace HairvestMoon.Inventory
     /// </summary>
     public class BackpackInventorySystem : IBusListener
     {
+        public const int MaxSlots = 30;
+        private int unlockedSlots = 10; // Or [SerializeField] if you want to tune in inspector
+        public int UnlockedSlots => unlockedSlots;
+
         private List<BackpackSlotData> _slots = new();
         public IReadOnlyList<BackpackSlotData> Slots => _slots;
 
@@ -35,58 +39,73 @@ namespace HairvestMoon.Inventory
         /// <summary>
         /// Sets up (or clears) all backpack slots for a new game.
         /// </summary>
-        public void Initialize(int slotCount = 12)
+        public void Initialize()
         {
             _slots.Clear();
-            for (int i = 0; i < slotCount; i++)
+            for (int i = 0; i < MaxSlots; i++)
                 _slots.Add(new BackpackSlotData());
+            unlockedSlots = 10; // reset at new game
             _eventBus.RaiseBackpackChanged();
         }
 
         /// <summary>
-        /// Checks if this item (with quantity) can be added to any slot.
+        /// Unlocks the next N slots, up to MaxSlots.
+        /// </summary>
+        public void UnlockSlots(int count)
+        {
+            int prev = unlockedSlots;
+            unlockedSlots = Mathf.Min(unlockedSlots + count, MaxSlots);
+            if (unlockedSlots != prev)
+                _eventBus.RaiseBackpackChanged();
+        }
+
+        /// <summary>
+        /// Checks if this item (with quantity) can be added to any unlocked slot.
         /// </summary>
         public bool CanAddItem(ItemData item, int quantity)
         {
             if (item == null || quantity <= 0) return false;
 
-            // Try to stack first (future: obey stack size)
-            foreach (var slot in _slots)
+            // Try to stack in unlocked slots
+            for (int i = 0; i < unlockedSlots; i++)
             {
+                var slot = _slots[i];
                 if (slot.Item == item /* && slot.Stack < item.MaxStackSize */)
                     return true; // can stack
             }
-
-            // Try to find an empty slot
-            foreach (var slot in _slots)
+            // Try to find an empty unlocked slot
+            for (int i = 0; i < unlockedSlots; i++)
             {
-                if (slot.Item == null)
+                if (_slots[i].Item == null)
                     return true;
             }
             return false; // No space
         }
 
         /// <summary>
-        /// Add an item to the first available slot (or stack if allowed). Returns true if added.
+        /// Attempts to add an item to the first available unlocked slot, stacking if possible.
+        /// Returns true if added, false if no space.
         /// </summary>
-        public bool AddItem(ItemData item, int quantity)
+        public bool AddItem(ItemData item, int quantity = 1)
         {
-            if (item == null || quantity <= 0) return false;
-
-            // Try to stack with existing, if stackable (future: add IsStackable flag)
-            for (int i = 0; i < _slots.Count; i++)
+            // Try to stack in unlocked slots first
+            for (int i = 0; i < unlockedSlots; i++)
             {
                 var slot = _slots[i];
-                if (slot.Item == item /* && slot.Stack < item.MaxStackSize */) // TODO: for stack size
+                if (slot.Item == item && slot.Stack < item.maxStack)
                 {
-                    slot.Stack += quantity;
-                    _eventBus.RaiseBackpackChanged();
-                    return true;
+                    int addable = Mathf.Min(quantity, item.maxStack - slot.Stack);
+                    slot.Stack += addable;
+                    quantity -= addable;
+                    if (quantity <= 0)
+                    {
+                        _eventBus.RaiseBackpackChanged();
+                        return true;
+                    }
                 }
             }
-
-            // Place in first empty slot
-            for (int i = 0; i < _slots.Count; i++)
+            // Try empty unlocked slot
+            for (int i = 0; i < unlockedSlots; i++)
             {
                 var slot = _slots[i];
                 if (slot.Item == null)
@@ -97,55 +116,77 @@ namespace HairvestMoon.Inventory
                     return true;
                 }
             }
-            return false; // Backpack full
+            // No space
+            return false;
         }
 
         /// <summary>
-        /// Remove an item (from any slot). Returns true if successful.
+        /// Attempts to remove the specified quantity of an item from unlocked slots.
+        /// Returns true if fully removed, false if not enough found.
         /// </summary>
-        public bool RemoveItem(ItemData item, int quantity)
+        public bool RemoveItem(ItemData item, int quantity = 1)
         {
-            if (item == null || quantity <= 0) return false;
-
-            for (int i = 0; i < _slots.Count; i++)
+            int removed = 0;
+            // Remove from stacked slots first (unlocked only)
+            for (int i = 0; i < unlockedSlots; i++)
             {
                 var slot = _slots[i];
-                if (slot.Item == item && slot.Stack >= quantity)
+                if (slot.Item == item && slot.Stack > 0)
                 {
-                    slot.Stack -= quantity;
-                    if (slot.Stack <= 0)
-                        slot.Clear();
-                    _eventBus.RaiseBackpackChanged();
-                    return true;
+                    int toRemove = Mathf.Min(slot.Stack, quantity - removed);
+                    slot.Stack -= toRemove;
+                    removed += toRemove;
+                    if (slot.Stack == 0)
+                        slot.Item = null;
+                    if (removed >= quantity)
+                    {
+                        _eventBus.RaiseBackpackChanged();
+                        return true;
+                    }
                 }
             }
-            return false; // Not enough items found
+            // Not enough found
+            if (removed > 0)
+                _eventBus.RaiseBackpackChanged();
+            return false;
         }
 
         /// <summary>
-        /// Moves an item from one slot to another (swap or merge).
+        /// Moves an item between unlocked slots if possible.
         /// </summary>
         public bool MoveItem(int fromIndex, int toIndex)
         {
-            if (!IsValidSlot(fromIndex) || !IsValidSlot(toIndex)) return false;
             if (fromIndex == toIndex) return false;
+            if (fromIndex < 0 || fromIndex >= unlockedSlots) return false;
+            if (toIndex < 0 || toIndex >= unlockedSlots) return false;
 
-            var from = _slots[fromIndex];
-            var to = _slots[toIndex];
+            var fromSlot = _slots[fromIndex];
+            var toSlot = _slots[toIndex];
 
-            // Simple swap if destination is empty or different item
-            if (to.Item == null || to.Item != from.Item)
+            if (fromSlot.Item == null) return false;
+            if (toSlot.Item == null)
             {
-                (_slots[fromIndex], _slots[toIndex]) = (_slots[toIndex], _slots[fromIndex]);
+                // Simple move
+                toSlot.Item = fromSlot.Item;
+                toSlot.Stack = fromSlot.Stack;
+                fromSlot.Item = null;
+                fromSlot.Stack = 0;
                 _eventBus.RaiseBackpackChanged();
                 return true;
             }
-            // Merge stacks if same item (future: obey MaxStackSize)
-            // TODO: For now, just sum, but clamp if needed
-            to.Stack += from.Stack;
-            from.Clear();
-            _eventBus.RaiseBackpackChanged();
-            return true;
+            // Stack if possible
+            if (fromSlot.Item == toSlot.Item && toSlot.Stack < toSlot.Item.maxStack)
+            {
+                int moveable = Mathf.Min(fromSlot.Stack, toSlot.Item.maxStack - toSlot.Stack);
+                toSlot.Stack += moveable;
+                fromSlot.Stack -= moveable;
+                if (fromSlot.Stack == 0)
+                    fromSlot.Item = null;
+                _eventBus.RaiseBackpackChanged();
+                return true;
+            }
+            // Can't stack/move
+            return false;
         }
 
         /// <summary>
