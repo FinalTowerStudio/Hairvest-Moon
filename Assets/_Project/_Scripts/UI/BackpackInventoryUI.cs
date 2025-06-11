@@ -73,7 +73,7 @@ namespace HairvestMoon.UI
             }
         }
 
-        private void RefreshUI()
+        public void RefreshUI()
         {
             for (int i = 0; i < BackpackInventorySystem.MaxSlots; i++)
             {
