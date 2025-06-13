@@ -64,8 +64,8 @@ namespace HairvestMoon.Tool
             // Close all selection UIs first
             _seedUI?.CloseSeedMenu();
             _wateringUI?.CloseWateringMenu();
-            _hoeUI?.CloseHoeMenu();
-            _harvestUI?.CloseHarvestMenu();
+            _hoeUI?.CloseMenu();
+            _harvestUI?.CloseMenu();
 
             // Open only the active tool's selection UI
             switch (tool)
@@ -77,10 +77,10 @@ namespace HairvestMoon.Tool
                     _wateringUI?.OpenWateringMenu();
                     break;
                 case ToolType.Hoe:
-                    _hoeUI?.OpenHoeMenu();
+                    _hoeUI?.OpenMenu();
                     break;
                 case ToolType.Harvest:
-                    _harvestUI?.OpenHarvestMenu();
+                    _harvestUI?.OpenMenu();
                     break;
             }
 
@@ -116,6 +116,11 @@ namespace HairvestMoon.Tool
         {
             waterCanCapacity = maxWaterCapacity;
             // TODO: Play full refill effect
+        }
+
+        public SeedData GetCurrentSelectedSeed()
+        {
+            return _seedUI?.GetSelectedSeed();
         }
 
 

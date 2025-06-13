@@ -60,6 +60,12 @@ namespace HairvestMoon.Core
         public event Action LookInputDetected;
         public void RaiseLookInputDetected() => LookInputDetected?.Invoke();
 
+        public event Action InteractPressed;
+        public void RaiseInteractPressed() => InteractPressed?.Invoke();
+        public event Action InteractReleased;
+        public void RaiseInteractReleased() => InteractReleased?.Invoke();
+
+
         // --- Farming/Player Events ---
         public event Action<Vector3Int> TileTilled;
         public void RaiseTileTilled(Vector3Int pos) => TileTilled?.Invoke(pos);
@@ -88,6 +94,10 @@ namespace HairvestMoon.Core
         // --- Tool/Hotbar Events ---
         public event Action<ToolType> ToolChanged;
         public void RaiseToolChanged(ToolType tool) => ToolChanged?.Invoke(tool);
+
+        public event System.Action<ItemData> SeedSelectionChanged;
+        public void RaiseSeedSelectionChanged(ItemData item) => SeedSelectionChanged?.Invoke(item);
+
 
         // --- Player Facing Event ---
         public event Action<PlayerFacingController.FacingDirection> FacingChanged;

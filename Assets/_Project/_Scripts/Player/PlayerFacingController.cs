@@ -1,12 +1,12 @@
 ﻿using HairvestMoon.Core;
 using UnityEngine;
-using System;
 
 namespace HairvestMoon.Player
 {
     /// <summary>
-    /// Determines the player's current facing direction based on movement or look input.
-    /// Publishes an event on the GameEventBus whenever facing changes.
+    /// Determines the player's facing direction based on *explicit* control mode:
+    /// - In Keyboard mode: faces in last nonzero movement direction.
+    /// - In Gamepad mode: faces in right stick direction if held, otherwise last faced.
     /// </summary>
     public class PlayerFacingController : IBusListener
     {
@@ -15,13 +15,6 @@ namespace HairvestMoon.Player
         private FacingDirection _currentFacing = FacingDirection.Right;
         public FacingDirection CurrentFacing => _currentFacing;
 
-        private FacingDirection _lastMoveFacing = FacingDirection.Right;
-        private bool _isInLookMode = false;
-        private float _lookStickyTimer = 0f;
-        private const float LookStickyTime = 0.18f;
-
-        // Dependencies
-        private InputController _inputController;
         private GameEventBus _eventBus;
         private bool _isInitialized = false;
 
@@ -33,53 +26,22 @@ namespace HairvestMoon.Player
 
         private void OnGlobalSystemsInitialized()
         {
-            _inputController = ServiceLocator.Get<InputController>();
             _isInitialized = true;
         }
 
         /// <summary>
-        /// Updates facing each frame. Stays in look direction until player actually moves.
-        /// Publishes to the event bus if facing changes.
+        /// Updates facing each frame using explicit ControlMode.
         /// </summary>
-        public void UpdateFacing(Vector2 moveInput, Vector2 lookInput, ControlMode mode, Vector2 playerPosition)
+        public void UpdateFacing(Vector2 moveInput, Vector2 lookInput, Vector2 playerPosition)
         {
             if (!_isInitialized) return;
-
-            bool isMoving = moveInput.sqrMagnitude > 0.01f;
-            bool lookInputActive = _inputController != null && _inputController.LookInputThisFrame;
-            bool lookInputHeld = lookInput.sqrMagnitude > 0.1f;
-
             FacingDirection newFacing = _currentFacing;
 
-            if (isMoving)
+            if (moveInput.sqrMagnitude > 0.01f)
             {
-                _isInLookMode = false;
-                _lookStickyTimer = 0f;
                 newFacing = FromVector(moveInput);
-                _lastMoveFacing = newFacing;
-            }
-            else if (lookInputHeld || lookInputActive)
-            {
-                _isInLookMode = true;
-                _lookStickyTimer = LookStickyTime;
-                Vector2 dir = (mode == ControlMode.Mouse)
-                    ? ((Vector2)Camera.main.ScreenToWorldPoint(lookInput) - playerPosition)
-                    : lookInput;
-                if (dir.sqrMagnitude > 0.01f)
-                    newFacing = FromVector(dir);
-            }
-            else if (_isInLookMode && _lookStickyTimer > 0f)
-            {
-                _lookStickyTimer -= Time.deltaTime;
-                // Keep facing as is during sticky look
-            }
-            else
-            {
-                _isInLookMode = false;
-                newFacing = _lastMoveFacing;
             }
 
-            // If facing actually changed, update and publish to the event bus
             if (newFacing != _currentFacing)
             {
                 _currentFacing = newFacing;
@@ -87,9 +49,6 @@ namespace HairvestMoon.Player
             }
         }
 
-        /// <summary>
-        /// Forces the player's facing for scripted/cutscene use.
-        /// </summary>
         public void ForceFacing(FacingDirection direction)
         {
             if (_currentFacing != direction)
@@ -97,9 +56,6 @@ namespace HairvestMoon.Player
                 _currentFacing = direction;
                 _eventBus?.RaiseFacingChanged(_currentFacing);
             }
-            _lastMoveFacing = direction;
-            _isInLookMode = false;
-            _lookStickyTimer = 0f;
         }
 
         private FacingDirection FromVector(Vector2 input)

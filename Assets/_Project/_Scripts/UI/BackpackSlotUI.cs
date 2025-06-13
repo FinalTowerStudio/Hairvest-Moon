@@ -66,7 +66,8 @@ namespace HairvestMoon.UI
         }
 
         /// <summary>
-        /// Locks or unlocks the slot visually and functionally.
+        /// Locks or unlocks the slot visually and functionally.  
+        /// Will always hide visuals if locked.
         /// </summary>
         public void SetLocked(bool locked)
         {

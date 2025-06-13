@@ -38,51 +38,35 @@ namespace HairvestMoon.UI
             BuildUI();
         }
 
-        /// <summary>
-        /// Builds the selection grid for watering upgrades/fertilizers owned.
-        /// </summary>
         private void BuildUI()
         {
             foreach (Transform child in wateringGridParent)
                 Destroy(child.gameObject);
 
             slots.Clear();
-            List<ItemData> wateringOptions = new();
 
-            foreach (var slot in _backpackInventory.Slots)
-            {
-                if (slot.Item != null && IsWateringOption(slot.Item))
-                    wateringOptions.Add(slot.Item);
-            }
+            var equippedWatering = _equipSystem.wateringTool;
 
-            if (wateringOptions.Count == 0)
-            {
-                _currentSelectedItem = null;
-                return;
-            }
+            // Always show hands slot
+            var handsGO = Instantiate(wateringSlotPrefab, wateringGridParent);
+            var handsSlotUI = handsGO.GetComponent<SelectionSlotUI>();
+            handsSlotUI.SetHandsTooltip(
+                "Hands (Nothing Equipped)",
+                "You have not equipped a watering can. Equip one to water crops!"
+            );
+            handsSlotUI.Initialize(null, OnWateringSelected);
+            handsSlotUI.SetSelected(equippedWatering == null);
+            slots.Add(handsSlotUI);
 
-            foreach (var item in wateringOptions)
+            // Show equipped watering tool if present
+            if (equippedWatering != null)
             {
                 var slotGO = Instantiate(wateringSlotPrefab, wateringGridParent);
                 var slotUI = slotGO.GetComponent<SelectionSlotUI>();
-                slotUI.Initialize(item, OnWateringSelected);
-                slotUI.SetSelected(item == _currentSelectedItem);
+                slotUI.Initialize(equippedWatering, OnWateringSelected);
+                slotUI.SetSelected(true);
                 slots.Add(slotUI);
             }
-
-            if (_currentSelectedItem == null)
-                OnWateringSelected(wateringOptions[0]);
-        }
-
-        /// <summary>
-        /// Define what counts as a watering option (upgrade, fertilizer, etc).
-        /// Adjust as needed for your game’s logic.
-        /// </summary>
-        private bool IsWateringOption(ItemData item)
-        {
-            // Could check itemType == Upgrade && toolType == WateringCan
-            // Or check for fertilizer tags—expand as your design requires
-            return item.itemType == ItemType.Upgrade && item.toolType == ToolType.WateringCan;
         }
 
         private void OnWateringSelected(ItemData selectedItem)
@@ -91,7 +75,7 @@ namespace HairvestMoon.UI
             foreach (var slot in slots)
                 slot.SetSelected(slot.Item == _currentSelectedItem);
 
-            // Optionally: Call a system to actually "use" the selection
+            _equipSystem.SetEquippedItem(ToolType.WateringCan, selectedItem);
         }
 
         public ItemData GetCurrentSelectedItem() => _currentSelectedItem;

@@ -9,10 +9,11 @@ namespace HairvestMoon.Farming
     {
         [Header("Tilemaps")]
         [SerializeField] private Tilemap baseFarmTilemap;
-        [SerializeField] private Tilemap overlayFarmTilemap;
+        [SerializeField] private Tilemap tilledOverlayTilemap;
+        [SerializeField] private Tilemap overlayFarmTilemap;  
 
         [Header("Tiles")]
-        [SerializeField] private TileBase baseTilledTile;
+        [SerializeField] private TileBase tilledOverlayTile;
         [SerializeField] private TileBase wateredOverlayTile;
 
         private readonly Dictionary<Vector3Int, FarmTileData> tileData = new();
@@ -36,12 +37,10 @@ namespace HairvestMoon.Farming
         public void Initialize()
         {
             tileData.Clear();
+            tilledOverlayTilemap.ClearAllTiles();
             overlayFarmTilemap.ClearAllTiles();
         }
 
-        /// <summary>
-        /// Returns the FarmTileData for the given position. Instantiates if not present.
-        /// </summary>
         public FarmTileData GetTileData(Vector3Int pos)
         {
             if (!tileData.ContainsKey(pos))
@@ -49,8 +48,20 @@ namespace HairvestMoon.Farming
             return tileData[pos];
         }
 
+        public bool IsFarmTile(Vector3Int cell)
+        {
+            return baseFarmTilemap != null && baseFarmTilemap.HasTile(cell);
+        }
+
+        public bool CanTill(Vector3Int cell)
+        {
+            return IsFarmTile(cell) && !IsTilled(cell) && !HasCrop(cell);
+        }
+        public bool IsTilled(Vector3Int cell) => GetTileData(cell).isTilled;
+        public bool HasCrop(Vector3Int cell) => GetTileData(cell).plantedCrop != null;
+
         /// <summary>
-        /// Tills or untils a tile, updates visual and fires event.
+        /// Tills or untils a tile: overlays the tilled visual, updates data, and fires event.
         /// </summary>
         public void SetTilled(Vector3Int pos, bool isTilled)
         {
@@ -59,26 +70,59 @@ namespace HairvestMoon.Farming
 
             if (!isTilled)
             {
-                // Untilling resets all crop and water state for the tile!
                 data.plantedCrop = null;
                 data.wateredMinutesAccumulated = 0f;
                 data.isWatered = false;
                 data.waterMinutesRemaining = 0;
             }
 
-            baseFarmTilemap.SetTile(pos, isTilled ? baseTilledTile : null);
-            UpdateWaterVisual(pos, data);
+            // Overlay tile: shows/hides "tilled" without altering baseFarmTilemap
+            tilledOverlayTilemap.SetTile(pos, isTilled ? tilledOverlayTile : null);
 
-            // We could add: _eventBus.RaiseTileTilled(pos);
+            UpdateWaterVisual(pos, data);
+            // Optional: _eventBus.RaiseTileTilled(pos);
         }
 
-        /// <summary>
-        /// Waters or unwaters a tile, updates visual and fires event.
-        /// </summary>
+        public bool CanWater(Vector3Int cell)
+        {
+            var data = GetTileData(cell);
+            return IsFarmTile(cell) && data.isTilled && !data.isWatered;
+        }
+        public bool CanPlant(Vector3Int cell, SeedData seed)
+        {
+            var data = GetTileData(cell);
+            return IsFarmTile(cell) && data.isTilled && !data.isWatered && data.plantedCrop == null && seed != null;
+        }
+        public bool CanHarvest(Vector3Int cell)
+        {
+            var data = GetTileData(cell);
+            return IsFarmTile(cell) && data.HasRipeCrop();
+        }
+
+        public void PlantSeed(Vector3Int cell, SeedData seed)
+        {
+            var data = GetTileData(cell);
+            data.plantedCrop = seed?.cropData;
+            data.wateredMinutesAccumulated = 0f;
+            // Optionally: trigger visuals/event
+        }
+
+        public void HarvestCrop(Vector3Int cell)
+        {
+            var data = GetTileData(cell);
+
+            data.plantedCrop = null;
+            data.wateredMinutesAccumulated = 0f;
+            data.isWatered = false;
+
+            // New: Reset to untilled
+            data.isTilled = false;
+            SetTilled(cell, false);
+        }
+
         public void SetWatered(Vector3Int pos, bool watered)
         {
             var data = GetTileData(pos);
-
             if (!data.isTilled && watered)
             {
                 Debug.LogWarning($"Tried to water untilled tile at {pos}.");
@@ -88,13 +132,9 @@ namespace HairvestMoon.Farming
             data.isWatered = watered;
             data.waterMinutesRemaining = watered ? FarmTileData.MinutesPerWatering : 0;
             UpdateWaterVisual(pos, data);
-
-            // We could add: _eventBus.RaiseTileWatered(pos);
+            // Optional: _eventBus.RaiseTileWatered(pos);
         }
 
-        /// <summary>
-        /// Ensures correct overlay for water state.
-        /// </summary>
         public void UpdateWaterVisual(Vector3Int pos, FarmTileData data)
         {
             if (!data.isTilled)
@@ -102,19 +142,15 @@ namespace HairvestMoon.Farming
                 overlayFarmTilemap.SetTile(pos, null);
                 return;
             }
-
             overlayFarmTilemap.SetTile(pos, data.isWatered ? wateredOverlayTile : null);
         }
 
-        /// <summary>
-        /// Removes a tile (e.g., for farm expansion/removal).
-        /// </summary>
         public void RemoveTile(Vector3Int pos)
         {
             tileData.Remove(pos);
-            baseFarmTilemap.SetTile(pos, null);
+            tilledOverlayTilemap.SetTile(pos, null);
             overlayFarmTilemap.SetTile(pos, null);
-            // Could fire a custom event for tile removal.
+            // baseFarmTilemap.SetTile(pos, null); // Only if you want to permanently remove ground!
         }
     }
 
@@ -129,11 +165,6 @@ namespace HairvestMoon.Farming
         public float wateredMinutesAccumulated;
         public bool wasFullyGrownLastTick = false;
 
-        // Add more state here as needed (fertilizer, pest, soil quality, etc.)
-        // public FertilizerType fertilizerType;
-        // public bool isWithered;
-        // public bool hasPests;
-
         public static readonly int MinutesPerWatering = 600;
 
         public FarmTileData() : this(Vector3Int.zero) { }
@@ -146,29 +177,18 @@ namespace HairvestMoon.Farming
             waterMinutesRemaining = 0;
             plantedCrop = null;
             wateredMinutesAccumulated = 0f;
-            // fertilizerType = FertilizerType.None;
-            // isWithered = false;
         }
 
-        /// <summary>
-        /// Returns how grown the crop is (0 to 1), or 0 if none.
-        /// </summary>
         public float GetGrowthProgressPercent()
         {
             return plantedCrop == null ? 0f : Mathf.Clamp01(wateredMinutesAccumulated / plantedCrop.growthDurationMinutes);
         }
 
-        /// <summary>
-        /// Returns true if the crop is fully grown and ready to harvest.
-        /// </summary>
         public bool HasRipeCrop()
         {
             return plantedCrop != null && wateredMinutesAccumulated >= plantedCrop.growthDurationMinutes;
         }
 
-        /// <summary>
-        /// Optionally, clear crop and water state (for untilling or crop removal).
-        /// </summary>
         public void Clear()
         {
             isTilled = false;
@@ -178,9 +198,6 @@ namespace HairvestMoon.Farming
             wateredMinutesAccumulated = 0f;
         }
 
-        /// <summary>
-        /// Returns true if the crop just finished growing this tick.
-        /// </summary>
         public bool IsJustFullyGrown()
         {
             bool now = HasRipeCrop();

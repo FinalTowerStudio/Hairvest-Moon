@@ -39,10 +39,7 @@ namespace HairvestMoon.Core
             _eventBus.InputLockChanged += OnInputLockChanged;
         }
 
-        private void OnGlobalSystemsInitialized()
-        {
-            Initialize();
-        }
+        private void OnGlobalSystemsInitialized() => Initialize();
 
         public void Initialize()
         {
@@ -50,50 +47,31 @@ namespace HairvestMoon.Core
             _input.Player.SetCallbacks(this);
             _input.Player.Enable();
             _input.Player.Pause.performed += OnPause;
-            playerInput.onControlsChanged += HandleControlsChanged;
             isInitialized = true;
-        }
-
-        private void HandleControlsChanged(PlayerInput input)
-        {
-            var scheme = input.currentControlScheme;
-            var newMode = scheme == "Gamepad" ? ControlMode.Gamepad : ControlMode.Mouse;
-
-            if (newMode != CurrentMode)
-            {
-                Debug.Log($"[InputController] Switched control scheme: {scheme} → {newMode}");
-                CurrentMode = newMode;
-                _eventBus.RaiseControlModeChanged(CurrentMode);
-            }
         }
 
         private void Update()
         {
             if (!isInitialized) return;
-
             LookInputThisFrame = false;
-
             if (_inputLocked) return;
 
-            if (CurrentMode == ControlMode.Gamepad)
+            LookInput = _mouseLook;
+            if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f)
             {
-                LookInput = _lastGamepadLookDir;
-
-                if (_gamepadLook.sqrMagnitude > 0.1f)
-                {
-                    _lastGamepadLookDir = _gamepadLook;
-                    LookInputThisFrame = true;
-                }
+                LookInputThisFrame = true;
+                _eventBus.RaiseLookInputDetected();
             }
-            else if (CurrentMode == ControlMode.Mouse)
-            {
-                LookInput = _mouseLook;
+        }
 
-                if (Mouse.current != null && Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f)
-                {
-                    LookInputThisFrame = true;
-                    _eventBus.RaiseLookInputDetected();
-                }
+        // For Futue use: this method allows manual control mode switching
+        public void SetControlMode(ControlMode mode)
+        {
+            if (CurrentMode != mode)
+            {
+                CurrentMode = mode;
+                _eventBus?.RaiseControlModeChanged(CurrentMode);
+                Debug.Log($"[InputController] Control mode manually set to: {CurrentMode}");
             }
         }
 
@@ -111,56 +89,33 @@ namespace HairvestMoon.Core
         public void OnLook(InputAction.CallbackContext context)
         {
             if (_inputLocked) return;
-
             if (Mouse.current != null)
-            {
                 _mouseLook = context.ReadValue<Vector2>();
-
-                if (Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f && CurrentMode != ControlMode.Mouse)
-                {
-                    Debug.Log("[InputController] Switching to Mouse due to movement.");
-                    CurrentMode = ControlMode.Mouse;
-                    _eventBus.RaiseControlModeChanged(CurrentMode);
-                }
-            }
         }
 
-        public void OnGamepadLook(InputAction.CallbackContext context)
+        public void OnGamepadLook(InputAction.CallbackContext context) { }
+        public void OnAttack(InputAction.CallbackContext context) { }
+        public void OnInteract(InputAction.CallbackContext context)
         {
             if (_inputLocked) return;
-
-            Vector2 input = context.ReadValue<Vector2>();
-            _gamepadLook = input;
-
-            if (input.sqrMagnitude > 0.1f)
-            {
-                _lastGamepadLookDir = input;
-
-                if (CurrentMode != ControlMode.Gamepad)
-                {
-                    Debug.Log("[InputController] Switching to Controller due to movement.");
-                    CurrentMode = ControlMode.Gamepad;
-                    _eventBus.RaiseControlModeChanged(CurrentMode);
-                }
-            }
+            if (context.started)
+                _eventBus?.RaiseInteractPressed();
+            else if (context.canceled)
+                _eventBus?.RaiseInteractReleased();
         }
 
-        public void OnAttack(InputAction.CallbackContext context) { }
-        public void OnInteract(InputAction.CallbackContext context) { }
         public void OnCrouch(InputAction.CallbackContext context) { }
         public void OnJump(InputAction.CallbackContext context) { }
         public void OnNext(InputAction.CallbackContext context)
         {
-            if (context.performed && !_inputLocked)
+            if (context.performed)
                 _eventBus.RaiseToolNext();
         }
-
         public void OnPrevious(InputAction.CallbackContext context)
         {
-            if (context.performed && !_inputLocked)
+            if (context.performed)
                 _eventBus.RaiseToolPrevious();
         }
-
         public void OnSprint(InputAction.CallbackContext context) { }
         public void OnPause(InputAction.CallbackContext context)
         {

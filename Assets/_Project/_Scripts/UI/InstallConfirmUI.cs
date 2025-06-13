@@ -12,8 +12,8 @@ namespace HairvestMoon.UI
     {
         [Header("UI References")]
         [SerializeField] private GameObject dialogRoot;
-        [SerializeField] private UnityEngine.UI.Button confirmButton;
-        [SerializeField] private UnityEngine.UI.Button cancelButton;
+        [SerializeField] private UnityEngine.UI.Button installButton;
+        [SerializeField] private UnityEngine.UI.Button uninstallButton;
         [SerializeField] private ItemDescriptionUI itemDescriptionUI;
 
         private BackpackEquipInstallManager _equipInstallManager;
@@ -28,41 +28,42 @@ namespace HairvestMoon.UI
         {
             _equipInstallManager = ServiceLocator.Get<BackpackEquipInstallManager>();
 
-            // Button wiring
-            if (confirmButton != null)
-                confirmButton.onClick.AddListener(OnConfirm);
-            if (cancelButton != null)
-                cancelButton.onClick.AddListener(Hide);
+            if (installButton != null)
+                installButton.onClick.AddListener(OnInstall);
+            if (uninstallButton != null)
+                uninstallButton.onClick.AddListener(OnUninstall);
         }
 
-        /// <summary>
-        /// Show confirmation dialog for given item.
-        /// </summary>
-        public void Show(ItemData item)
+        // Called from BackpackInventoryUI when a slot is selected
+        public void ShowForInstall(ItemData item)
         {
             _pendingItem = item;
-            dialogRoot.SetActive(true);
-            if (itemDescriptionUI != null)
-                itemDescriptionUI.SetItem(item);
+            installButton.interactable = item != null && (item.itemType == ItemType.Tool || item.itemType == ItemType.Upgrade);
+            uninstallButton.interactable = false;
+            itemDescriptionUI.SetItem(item);
         }
 
-        /// <summary>
-        /// Hides dialog and clears pending item.
-        /// </summary>
-        public void Hide()
+        // Called from EquipSlotUI or UI when equip slot is selected
+        public void ShowForUninstall(ItemData item)
         {
-            dialogRoot.SetActive(false);
-            _pendingItem = null;
-            if (itemDescriptionUI != null)
-                itemDescriptionUI.Clear();
+            _pendingItem = item;
+            installButton.interactable = false;
+            uninstallButton.interactable = item != null; // Only if something is equipped
+            itemDescriptionUI.SetItem(item);
         }
 
-        private void OnConfirm()
+        private void OnInstall()
         {
             if (_pendingItem == null) return;
             bool installed = _equipInstallManager.TryInstallItem(_pendingItem);
-            // Optionally: play feedback SFX, show success/error
-            Hide();
+            // Optionally: Show result/feedback
+        }
+
+        private void OnUninstall()
+        {
+            if (_pendingItem == null) return;
+            bool uninstalled = _equipInstallManager.TryUninstallItem(_pendingItem);
+            // Optionally: Show result/feedback
         }
     }
 }

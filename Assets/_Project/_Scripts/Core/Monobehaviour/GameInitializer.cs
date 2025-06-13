@@ -42,7 +42,8 @@ namespace HairvestMoon.Core
         [SerializeField] private SelectionTooltipUI _selectionTooltipUI;
         [SerializeField] private BackpackCapacityBarUI _backpackCapacityBarUI;
         [SerializeField] private DebugUIOverlay _debugOverlayUI;
-        
+        [SerializeField] private ControlModeSwitchUI _controlModeSwitchUI;
+
 
         private void Awake()
         {
@@ -95,6 +96,7 @@ namespace HairvestMoon.Core
             ServiceLocator.Register(_playerStateController);
             ServiceLocator.Register(_installConfirmUI);
             ServiceLocator.Register(_mainMenuUI);
+            ServiceLocator.Register(_controlModeSwitchUI);
             ServiceLocator.Register(_backpackInventoryUI);
             ServiceLocator.Register(_resourceInventoryUI);
             ServiceLocator.Register(_seedSelectionUI);
@@ -128,6 +130,7 @@ namespace HairvestMoon.Core
             _backpackInventoryUI.RegisterBusListeners();
             _resourceInventoryUI.RegisterBusListeners();
             _mainMenuUI.RegisterBusListeners();
+            _controlModeSwitchUI.RegisterBusListeners();
             _seedSelectionUI.RegisterBusListeners();
             _wateringSelectionUI.RegisterBusListeners();
             _hoeSelectionUI.RegisterBusListeners();

@@ -1,14 +1,14 @@
 using HairvestMoon.Core;
+using HairvestMoon.Farming;
 using HairvestMoon.Player;
+using System;
 using UnityEngine;
 using UnityEngine.Tilemaps;
-using System.Collections.Generic;
 
 namespace HairvestMoon.Interaction
 {
     /// <summary>
-    /// Handles tile targeting for interaction and highlighting (mouse or stick/arc).
-    /// Subscribes to facing changes for instant updates.
+    /// Handles tile targeting for interaction and highlighting (mouse only).
     /// </summary>
     public class TileTargetingSystem : MonoBehaviour, IBusListener
     {
@@ -18,8 +18,6 @@ namespace HairvestMoon.Interaction
         [SerializeField] private Tile _highlightTile;
 
         [Header("Settings")]
-        [SerializeField] private int _highlightRange = 1;
-        [SerializeField] private Vector2Int _coneSize = new(3, 1);
         [SerializeField] private float _footPositionYOffset = -0.25f;
         [SerializeField] private float _mouseTargetMaxDistance = 1.5f;
         [SerializeField] private bool _drawDebugGizmos = true;
@@ -27,10 +25,11 @@ namespace HairvestMoon.Interaction
 
         // Cached references
         private Player_Controller _player;
-        private InputController _inputController;
-        private PlayerFacingController _facingController;
         private GameEventBus _eventBus;
         private bool _isInitialized = false;
+        private FarmTileDataManager _farmTileData;
+        
+        public Func<Vector3Int, bool> TileIsValid;
 
         private Vector3Int? _currentTargetedTile;
         private Vector3Int? _lastHighlightedTile;
@@ -43,21 +42,14 @@ namespace HairvestMoon.Interaction
         {
             _eventBus = ServiceLocator.Get<GameEventBus>();
             _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
-            _eventBus.FacingChanged += OnPlayerFacingChanged; // <-- subscribe here
         }
 
         private void OnGlobalSystemsInitialized()
         {
             _player = ServiceLocator.Get<Player_Controller>();
-            _inputController = ServiceLocator.Get<InputController>();
-            _facingController = ServiceLocator.Get<PlayerFacingController>();
+            _farmTileData = ServiceLocator.Get<FarmTileDataManager>();
+            TileIsValid = cell => _farmTileData.IsFarmTile(cell);
             _isInitialized = true;
-            RefreshHighlight();
-        }
-
-        private void OnPlayerFacingChanged(PlayerFacingController.FacingDirection newDir)
-        {
-            // Refresh highlight/arc as soon as facing changes
             RefreshHighlight();
         }
 
@@ -95,10 +87,13 @@ namespace HairvestMoon.Interaction
             Vector3 footPos = _player.Position + new Vector3(0, _footPositionYOffset, 0);
             Vector3Int playerCell = _grid.WorldToCell(footPos);
 
-            if (_inputController.CurrentMode == ControlMode.Mouse)
-                return GetMouseTargetTile(playerCell, footPos);
-            else
-                return GetArcTargetTile(playerCell, footPos);
+            Vector3Int? candidate = GetMouseTargetTile(playerCell, footPos);
+
+            // Filter by farm tile + delegate
+            if (candidate.HasValue && TileIsValid != null && !TileIsValid(candidate.Value))
+                return null;
+
+            return candidate;
         }
 
         private Vector3Int? GetMouseTargetTile(Vector3Int playerCell, Vector3 worldPos)
@@ -117,47 +112,6 @@ namespace HairvestMoon.Interaction
             return null;
         }
 
-        private Vector3Int? GetArcTargetTile(Vector3Int origin, Vector3 originWorld)
-        {
-            var facing = _facingController.CurrentFacing;
-            var arcTiles = GetArcTiles(origin, facing);
-
-            Vector3Int? best = null;
-            float bestScore = float.MaxValue;
-
-            foreach (var cell in arcTiles)
-            {
-                float dist = Vector3.Distance(_grid.GetCellCenterWorld(cell), originWorld);
-                if (dist < bestScore)
-                {
-                    best = cell;
-                    bestScore = dist;
-                }
-            }
-            return best;
-        }
-
-        private List<Vector3Int> GetArcTiles(Vector3Int origin, PlayerFacingController.FacingDirection facing)
-        {
-            List<Vector3Int> result = new();
-            for (int depth = 1; depth <= _highlightRange; depth++)
-            {
-                for (int offset = -_coneSize.x / 2; offset <= _coneSize.x / 2; offset++)
-                {
-                    Vector3Int offsetVec = facing switch
-                    {
-                        PlayerFacingController.FacingDirection.Up => new(offset, depth, 0),
-                        PlayerFacingController.FacingDirection.Down => new(offset, -depth, 0),
-                        PlayerFacingController.FacingDirection.Left => new(-depth, offset, 0),
-                        PlayerFacingController.FacingDirection.Right => new(depth, offset, 0),
-                        _ => Vector3Int.zero
-                    };
-                    result.Add(origin + offsetVec);
-                }
-            }
-            return result;
-        }
-
         // --- Debug Gizmos (optional) ---
 
         private void OnDrawGizmos()
@@ -169,11 +123,12 @@ namespace HairvestMoon.Interaction
                 : transform.position + new Vector3(0, _footPositionYOffset, 0);
 
             Vector3Int playerCell = _grid.WorldToCell(footPos);
-            var arcTiles = GetArcTiles(playerCell, _facingController != null ? _facingController.CurrentFacing : PlayerFacingController.FacingDirection.Right);
 
             Gizmos.color = _gizmoColor;
-            foreach (var cell in arcTiles)
-                Gizmos.DrawCube(_grid.GetCellCenterWorld(cell), Vector3.one * 0.8f);
+            // Optionally, draw a square of selectable tiles
+            for (int dx = -1; dx <= 1; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                    Gizmos.DrawCube(_grid.GetCellCenterWorld(playerCell + new Vector3Int(dx, dy, 0)), Vector3.one * 0.8f);
         }
     }
 }

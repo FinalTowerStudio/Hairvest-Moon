@@ -56,8 +56,21 @@ namespace HairvestMoon.Tool
             if (Keyboard.current.digit4Key.wasPressedThisFrame) SetToolByIndex(3);
         }
 
-        public void HandleNext() => CycleTool(1);
-        public void HandlePrevious() => CycleTool(-1);
+        public void HandleNext()
+        {
+            var stateManager = ServiceLocator.Get<GameStateManager>();
+            if (stateManager.CurrentState != GameState.FreeRoam) return;
+
+            CycleTool(1);
+        }
+        public void HandlePrevious()
+        {
+            var stateManager = ServiceLocator.Get<GameStateManager>();
+            if (stateManager.CurrentState != GameState.FreeRoam) return;
+           
+            CycleTool(-1);
+            
+        }
 
         /// <summary>
         /// Sets tool by direct hotkey index.

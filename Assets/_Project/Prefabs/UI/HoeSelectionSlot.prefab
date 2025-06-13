@@ -182,6 +182,7 @@ MonoBehaviour:
   iconImage: {fileID: 3351862502482685928}
   highlightObj: {fileID: 1997504577269984951}
   button: {fileID: 6114039960314976012}
+  handIcon: {fileID: -1624108181874779714, guid: b33cba13a2658a04dbd0683eb8062191, type: 3}
 --- !u!1 &8855418130551454299
 GameObject:
   m_ObjectHideFlags: 0

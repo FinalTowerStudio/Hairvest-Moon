@@ -15,6 +15,8 @@ MonoBehaviour:
   itemID: QuestItem_BlackFeather
   itemName: BlackFeather
   description: Feather of one of the forest crows
-  itemIcon: {fileID: 21300000, guid: 0203f0597bbef413fb3d36eb93c39466, type: 3}
+  itemIcon: {fileID: 5797998277019770603, guid: b0c7a0b900492054cacc02f83585c7f0, type: 3}
   itemType: 6
+  toolType: 0
   sellPrice: 0
+  maxStack: 99

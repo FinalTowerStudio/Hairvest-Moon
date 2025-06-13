@@ -39,6 +39,7 @@ namespace HairvestMoon.UI
 
         /// <summary>
         /// Builds selection grid for seeds owned in inventory.
+        /// If none are available, shows a "hands"/empty slot with context tooltip.
         /// </summary>
         private void BuildUI()
         {
@@ -57,8 +58,19 @@ namespace HairvestMoon.UI
 
             if (seedsInInventory.Count == 0)
             {
+                // Add a "hands"/empty slot as the only option
+                var handsGO = Instantiate(seedSlotPrefab, seedGridParent);
+                var handsSlotUI = handsGO.GetComponent<SelectionSlotUI>();
+                handsSlotUI.SetHandsTooltip(
+                    "No Seeds Available",
+                    "You don’t have any seeds to plant. Buy or find seeds to get started!"
+                );
+                handsSlotUI.Initialize(null, OnSeedSelected);
+                handsSlotUI.SetSelected(true);
+                slots.Add(handsSlotUI);
+
                 _currentSelectedItem = null;
-                farmToolHandler.SetSelectedSeed(null);
+                //farmToolHandler.SetSelectedSeed(null);
                 return;
             }
 
@@ -84,12 +96,16 @@ namespace HairvestMoon.UI
 
             foreach (var slot in slots)
                 slot.SetSelected(slot.Item == _currentSelectedItem);
+
+            // Raise selection changed event
+            ServiceLocator.Get<GameEventBus>().RaiseSeedSelectionChanged(_currentSelectedItem);
         }
+
 
         private void SetSelectedSeed(ItemData selectedItem)
         {
             var seedData = _seedDatabase.GetSeedDataByItem(selectedItem);
-            farmToolHandler.SetSelectedSeed(seedData);
+            //farmToolHandler.SetSelectedSeed(seedData);
         }
 
         private void RefreshUI()
@@ -116,5 +132,13 @@ namespace HairvestMoon.UI
             _canvasGroup.interactable = visible;
             _canvasGroup.blocksRaycasts = visible;
         }
+
+        public SeedData GetSelectedSeed()
+        {
+            if (_currentSelectedItem == null || _seedDatabase == null)
+                return null;
+            return _seedDatabase.GetSeedDataByItem(_currentSelectedItem);
+        }
+
     }
 }

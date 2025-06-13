@@ -1,109 +1,100 @@
+using HairvestMoon.Core;
+using HairvestMoon.Inventory;
+using HairvestMoon.Tool;
 using System.Collections.Generic;
 using UnityEngine;
-using HairvestMoon.Inventory;
-using HairvestMoon.Core;
-using HairvestMoon.Tool;
 
 namespace HairvestMoon.UI
 {
     /// <summary>
-    /// UI for selecting and equipping a hoe tool or upgrade.
-    /// Shows all available options, highlights current equip.
+    /// UI for selecting equipped hoe or upgrade, always includes "hands" slot.
     /// </summary>
     public class HoeSelectionUI : MonoBehaviour, IBusListener
     {
+        [Header("UI References")]
+        [SerializeField] private GameObject optionPrefab;
         [SerializeField] private Transform optionParent;
-        [SerializeField] private SelectionSlotUI optionPrefab;
 
         private List<SelectionSlotUI> _slots = new();
+        private ItemData _currentSelectedItem;
+        private CanvasGroup _canvasGroup;
         private BackpackInventorySystem _backpackInventory;
         private BackpackEquipSystem _equipSystem;
-        private BackpackEquipInstallManager _equipInstallManager;
-        private GameEventBus _eventBus;
-        private bool _isOpen = false;
 
         public void RegisterBusListeners()
         {
-            _eventBus = ServiceLocator.Get<GameEventBus>();
-            _eventBus.BackpackChanged += RefreshUI;
-            _eventBus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            var bus = ServiceLocator.Get<GameEventBus>();
+            bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            bus.BackpackChanged += RefreshUI;
         }
 
         private void OnGlobalSystemsInitialized()
         {
             _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
             _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
-            _equipInstallManager = ServiceLocator.Get<BackpackEquipInstallManager>();
-            BuildOptions();
-            RefreshUI();
+            _canvasGroup = GetComponent<CanvasGroup>();
+            BuildUI();
         }
 
-        /// <summary>
-        /// Builds option slots for all owned hoe tools/upgrades.
-        /// </summary>
-        private void BuildOptions()
+        private void BuildUI()
         {
-            foreach (Transform child in optionParent) Destroy(child.gameObject);
+            foreach (Transform child in optionParent)
+                Destroy(child.gameObject);
+
             _slots.Clear();
 
-            foreach (var slot in _backpackInventory.Slots)
+            var equippedHoe = _equipSystem.hoeTool;
+
+            // Always show hands slot
+            var handsGO = Instantiate(optionPrefab, optionParent);
+            var handsSlot = handsGO.GetComponent<SelectionSlotUI>();
+            handsSlot.SetHandsTooltip(
+                "Hands (Nothing Equipped)",
+                "You have not equipped a hoe. Tilling with your hands may be possible, but it's not as effective!"
+            );
+            handsSlot.Initialize(null, OnOptionSelected);
+            handsSlot.SetSelected(equippedHoe == null);
+            _slots.Add(handsSlot);
+
+            // Show equipped hoe if present
+            if (equippedHoe != null)
             {
-                if (slot.Item != null && slot.Item.toolType == ToolType.Hoe)
-                {
-                    var slotUI = Instantiate(optionPrefab, optionParent);
-                    slotUI.Initialize(slot.Item, OnOptionSelected);
-                    _slots.Add(slotUI);
-                }
+                var slotUI = Instantiate(optionPrefab, optionParent).GetComponent<SelectionSlotUI>();
+                slotUI.Initialize(equippedHoe, OnOptionSelected);
+                slotUI.SetSelected(true);
+                _slots.Add(slotUI);
             }
         }
 
-        /// <summary>
-        /// Called when player selects a hoe option.
-        /// </summary>
-        private void OnOptionSelected(ItemData item)
+        private void OnOptionSelected(ItemData selectedItem)
         {
-            if (_equipInstallManager.TryInstallItem(item))
-                RefreshUI();
-            // TODO: Play sound, show feedback, close menu if you wish
+            // Select and equip/unequip hoe
+            _currentSelectedItem = selectedItem;
+            foreach (var slot in _slots)
+                slot.SetSelected(slot.Item == _currentSelectedItem);
+
+            _equipSystem.SetEquippedItem(ToolType.Hoe, selectedItem);
         }
 
-        /// <summary>
-        /// Highlights the currently equipped hoe.
-        /// </summary>
-        public void RefreshUI()
-        {
-            foreach (var slotUI in _slots)
-            {
-                bool isEquipped = (_equipSystem.hoeTool == slotUI.Item || _equipSystem.hoeUpgrade == slotUI.Item);
-                slotUI.SetSelected(isEquipped);
-            }
-        }
+        public ItemData GetCurrentSelectedItem() => _currentSelectedItem;
 
-        /// <summary>
-        /// Opens the selection menu (show/hide logic).
-        /// </summary>
-        public void OpenHoeMenu()
+        private void RefreshUI() => BuildUI();
+
+        public void OpenMenu()
         {
-            _isOpen = true;
             gameObject.SetActive(true);
-            RefreshUI();
+            BuildUI();
+            SetCanvasVisible(true);
         }
 
-        public void CloseHoeMenu()
-        {
-            _isOpen = false;
-            gameObject.SetActive(false);
-        }
+        public void CloseMenu() => SetCanvasVisible(false);
 
-        /// <summary>
-        /// Returns currently selected option (for external queries).
-        /// </summary>
-        public ItemData GetCurrentSelectedItem()
+        private void SetCanvasVisible(bool visible)
         {
-            foreach (var slotUI in _slots)
-                if (slotUI.IsSelected)
-                    return slotUI.Item;
-            return null;
+            if (_canvasGroup == null) _canvasGroup = GetComponent<CanvasGroup>();
+            _canvasGroup.alpha = visible ? 1f : 0f;
+            _canvasGroup.interactable = visible;
+            _canvasGroup.blocksRaycasts = visible;
         }
     }
 }
