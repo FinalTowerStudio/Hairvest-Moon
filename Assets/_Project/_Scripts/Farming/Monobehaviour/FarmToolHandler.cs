@@ -129,22 +129,48 @@ namespace HairvestMoon.Farming
 
             var tile = targetTile.Value;
             var data = ServiceLocator.Get<FarmTileDataManager>().GetTileData(tile);
+            var equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
 
             switch (ServiceLocator.Get<ToolSystem>().CurrentTool)
             {
                 case ToolType.Hoe:
+                    if (equipSystem.hoeTool == null)
+                    {
+                        ShowDebug("Tilling with hands (no hoe equipped).");
+                        // TODO: Hands penalty here
+                    }
+                    else
+                    {
+                        ShowDebug("Tilling with equipped hoe!");
+                    }
                     TryTill(tile, data);
                     break;
 
                 case ToolType.WateringCan:
+                    if (equipSystem.wateringTool == null)
+                    {
+                        ShowDebug("You have not equipped a watering can!");
+                        // TODO: Play error sound
+                        return; // Block action
+                    }
+                    ShowDebug("Watering with can.");
                     TryWater(tile, data);
                     break;
 
                 case ToolType.Seed:
-                    TryPlantSeed(tile, data);
+                    TryPlantSeed(tile, data); // Handles feedback internally
                     break;
 
                 case ToolType.Harvest:
+                    if (equipSystem.harvestTool == null)
+                    {
+                        ShowDebug("Harvesting by hand (no tool equipped).");
+                        // TODO: Hands penalty here
+                    }
+                    else
+                    {
+                        ShowDebug("Harvesting with equipped tool!");
+                    }
                     TryHarvest(tile, data);
                     break;
 
@@ -152,10 +178,7 @@ namespace HairvestMoon.Farming
                     ShowDebug("No tool selected");
                     break;
             }
-
-            // --- SFX/VFX hook ---
-            // TODO: Play generic "tool used" sound, or
-            // trigger animation here, based on ToolType.
+            // SFX/VFX TODO
         }
 
 

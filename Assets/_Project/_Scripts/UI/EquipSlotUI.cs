@@ -11,6 +11,7 @@ namespace HairvestMoon.UI
     public class EquipSlotUI : MonoBehaviour
     {
         [SerializeField] private Image iconImage;
+        [SerializeField] private Sprite emptySlotSprite;
         [SerializeField] private GameObject highlightObj;
         [SerializeField] private Button button;
 
@@ -23,9 +24,8 @@ namespace HairvestMoon.UI
         public void SetItem(ItemData item, bool isEquipped, System.Action<ItemData> onClicked = null)
         {
             Item = item;
-            iconImage.sprite = item ? item.itemIcon : null;
+            iconImage.sprite = item ? item.itemIcon : emptySlotSprite;
             highlightObj.SetActive(isEquipped);
-            gameObject.SetActive(item != null);
 
             _onClicked = onClicked;
             if (button != null)
@@ -35,6 +35,13 @@ namespace HairvestMoon.UI
                     button.onClick.AddListener(() => _onClicked(Item));
             }
         }
+
+        public void SetHighlight(bool highlight)
+        {
+            if (highlightObj != null)
+                highlightObj.SetActive(highlight);
+        }
+
 
         public void OnPointerEnter()
         {

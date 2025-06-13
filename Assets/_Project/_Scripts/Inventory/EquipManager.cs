@@ -1,11 +1,11 @@
 using HairvestMoon.Core;
-using HairvestMoon.Inventory;
+using HairvestMoon.Tool;
 
 namespace HairvestMoon.Inventory
 {
     /// <summary>
-    /// Manages equip/install requests for tools and upgrades.
-    /// Ensures valid state and notifies inventory/equip systems and UI.
+    /// Handles the logic for installing (equipping) or uninstalling (unequipping) tools/upgrades.
+    /// Mutates BackpackInventorySystem and BackpackEquipSystem. Fires events for UI updates.
     /// </summary>
     public class EquipManager : IBusListener
     {
@@ -24,46 +24,70 @@ namespace HairvestMoon.Inventory
         {
             _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
             _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
-            Initialize();
             _isInitialized = true;
         }
-
-        /// <summary>
-        /// Empty for now, but may need to sync state on game start.
-        /// </summary>
-        public void Initialize() { }
-
-        /// <summary>
-        /// Handles install/equip requests from the UI or gameplay.
-        /// Removes from inventory, installs in equip system, and fires UI events.
-        /// </summary>
         public void InstallItem(ItemData item)
         {
-            if (item == null) return;
+            if (!_isInitialized || item == null) return;
 
-            // Remove from backpack inventory if present
-            bool removed = _backpackInventory.RemoveItem(item, 1);
-            if (!removed) return;
+            var slotType = _equipSystem.GetEquipSlotType(item);
 
-            _equipSystem.EquipItem(item);
-            _eventBus?.RaiseItemInstalled(item);
+            if (item.itemType == ItemType.Tool)
+            {
+                // Remove tool from inventory
+                if (!_backpackInventory.RemoveItem(item, 1)) return;
 
-            // TODO: Fire analytics/event bus for "ItemEquipped"
-            // TODO: Play sound or animation for equip
+                // Swap out any tool already equipped (only the tool, not upgrade!)
+                var currentlyEquippedTool = _equipSystem.GetEquippedTool(slotType);
+                if (currentlyEquippedTool != null)
+                    _backpackInventory.AddItem(currentlyEquippedTool, 1);
+
+                // Install tool (leave upgrade as-is)
+                _equipSystem.SetEquippedTool(slotType, item);
+            }
+            else if (item.itemType == ItemType.Upgrade)
+            {
+                // Remove upgrade from inventory
+                if (!_backpackInventory.RemoveItem(item, 1)) return;
+
+                // Swap out any upgrade already equipped (only the upgrade, not tool!)
+                var currentlyEquippedUpgrade = _equipSystem.GetEquippedUpgrade(slotType);
+                if (currentlyEquippedUpgrade != null)
+                    _backpackInventory.AddItem(currentlyEquippedUpgrade, 1);
+
+                // Install upgrade (leave tool as-is)
+                _equipSystem.SetEquippedUpgrade(slotType, item);
+            }
+
+            _eventBus.RaiseBackpackChanged();
         }
 
-        /// <summary>
-        /// Handles unequip requests (optional).
-        /// </summary>
         public void UninstallItem(ItemData item)
         {
-            if (item == null) return;
+            if (!_isInitialized || item == null) return;
 
-            _equipSystem.UnequipItem(item);
-            _backpackInventory.AddItem(item, 1);
-            _eventBus?.RaiseBackpackChanged();
+            var slotType = _equipSystem.GetEquipSlotType(item);
 
-            // TODO: Fire analytics/event bus for "ItemUnequipped"
+            if (item.itemType == ItemType.Tool)
+            {
+                // Remove tool, leave upgrade in place
+                if (_equipSystem.GetEquippedTool(slotType) == item)
+                {
+                    _equipSystem.SetEquippedTool(slotType, null);
+                    _backpackInventory.AddItem(item, 1);
+                }
+            }
+            else if (item.itemType == ItemType.Upgrade)
+            {
+                // Remove upgrade, leave tool in place
+                if (_equipSystem.GetEquippedUpgrade(slotType) == item)
+                {
+                    _equipSystem.SetEquippedUpgrade(slotType, null);
+                    _backpackInventory.AddItem(item, 1);
+                }
+            }
+
+            _eventBus.RaiseBackpackChanged();
         }
     }
 }

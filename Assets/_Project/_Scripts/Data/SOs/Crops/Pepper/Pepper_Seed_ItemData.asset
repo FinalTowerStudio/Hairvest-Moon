@@ -15,7 +15,8 @@ MonoBehaviour:
   itemID: Pepper_Seed
   itemName: Pepper
   description: Seed to grow pepper
-  itemIcon: {fileID: -982056863, guid: 80b481319a15aae44b393c52687c1cb0, type: 3}
+  itemIcon: {fileID: 6480232462004730519, guid: 65c29362f9ba94e4ebb9de3d8a0ee68f, type: 3}
   itemType: 1
   toolType: 3
   sellPrice: 2
+  maxStack: 99

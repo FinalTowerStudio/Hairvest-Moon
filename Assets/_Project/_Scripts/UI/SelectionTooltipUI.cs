@@ -66,6 +66,21 @@ namespace HairvestMoon.UI
             tooltipPanel.transform.position = mousePos + new Vector3(12f, -12f, 0f);
         }
 
+        public static void ShowHandsTooltip(string title, string description)
+        {
+            if (_instance != null)
+                _instance.ShowCustomTooltip(title, description);
+        }
+
+        public void ShowCustomTooltip(string name, string desc)
+        {
+            nameText.text = name;
+            descriptionText.text = desc;
+            tooltipPanel.SetActive(true);
+            Vector3 mousePos = Input.mousePosition;
+            tooltipPanel.transform.position = mousePos + new Vector3(12f, -12f, 0f);
+        }
+
         public void HideTooltip()
         {
             tooltipPanel.SetActive(false);

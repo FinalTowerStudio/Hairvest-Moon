@@ -34,11 +34,20 @@ namespace HairvestMoon.UI
 
         /// <summary>
         /// Updates fill amount: filled unlocked slots divided by unlocked slots.
+        /// Always clamps unlocked to actual slot count.
         /// </summary>
         private void Refresh()
         {
-            if (_backpackInventory == null) return;
-            int unlocked = _backpackInventory.UnlockedSlots;
+            if (_backpackInventory == null || _backpackInventory.Slots == null)
+                return;
+
+            int actualSlotCount = _backpackInventory.Slots.Count;
+            int unlocked = Mathf.Min(_backpackInventory.UnlockedSlots, BackpackInventorySystem.MaxSlots, actualSlotCount);
+
+#if UNITY_EDITOR
+            Debug.Log($"[BackpackCapacityBarUI] Fill: {unlocked} unlocked, model slots: {actualSlotCount}");
+#endif
+
             int filled = 0;
             var slots = _backpackInventory.Slots;
             for (int i = 0; i < unlocked; i++)

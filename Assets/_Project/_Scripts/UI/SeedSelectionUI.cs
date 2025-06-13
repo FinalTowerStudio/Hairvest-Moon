@@ -39,6 +39,7 @@ namespace HairvestMoon.UI
 
         /// <summary>
         /// Builds selection grid for seeds owned in inventory.
+        /// If none are available, shows a "hands"/empty slot with context tooltip.
         /// </summary>
         private void BuildUI()
         {
@@ -57,6 +58,17 @@ namespace HairvestMoon.UI
 
             if (seedsInInventory.Count == 0)
             {
+                // Add a "hands"/empty slot as the only option
+                var handsGO = Instantiate(seedSlotPrefab, seedGridParent);
+                var handsSlotUI = handsGO.GetComponent<SelectionSlotUI>();
+                handsSlotUI.SetHandsTooltip(
+                    "No Seeds Available",
+                    "You don’t have any seeds to plant. Buy or find seeds to get started!"
+                );
+                handsSlotUI.Initialize(null, OnSeedSelected);
+                handsSlotUI.SetSelected(true);
+                slots.Add(handsSlotUI);
+
                 _currentSelectedItem = null;
                 farmToolHandler.SetSelectedSeed(null);
                 return;

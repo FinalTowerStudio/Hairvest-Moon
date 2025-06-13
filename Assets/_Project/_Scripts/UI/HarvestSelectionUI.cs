@@ -1,93 +1,93 @@
+using HairvestMoon.Core;
+using HairvestMoon.Inventory;
+using HairvestMoon.Tool;
 using System.Collections.Generic;
 using UnityEngine;
-using HairvestMoon.Inventory;
-using HairvestMoon.Core;
 
 namespace HairvestMoon.UI
 {
     /// <summary>
-    /// UI for selecting harvest mode/upgrade. Shows normal and upgraded options, highlights selected.
+    /// UI for selecting equipped harvest tool or upgrade, always includes "hands" slot.
     /// </summary>
     public class HarvestSelectionUI : MonoBehaviour, IBusListener
     {
         [Header("UI References")]
-        [SerializeField] private GameObject harvestSelectionSlotPrefab;
-        [SerializeField] private Transform gridParent;
+        [SerializeField] private GameObject optionPrefab;
+        [SerializeField] private Transform optionParent;
 
-        private List<SelectionSlotUI> slots = new();
-        private ItemData _currentSelectedHarvestOption;
+        private List<SelectionSlotUI> _slots = new();
+        private ItemData _currentSelectedItem;
         private CanvasGroup _canvasGroup;
-        private BackpackEquipSystem _equipSystem;
         private BackpackInventorySystem _backpackInventory;
+        private BackpackEquipSystem _equipSystem;
 
         public void RegisterBusListeners()
         {
             var bus = ServiceLocator.Get<GameEventBus>();
-            bus.BackpackChanged += RefreshUI;
             bus.GlobalSystemsInitialized += OnGlobalSystemsInitialized;
+            bus.BackpackChanged += RefreshUI;
         }
 
         private void OnGlobalSystemsInitialized()
         {
-            _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
             _backpackInventory = ServiceLocator.Get<BackpackInventorySystem>();
+            _equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
             _canvasGroup = GetComponent<CanvasGroup>();
             BuildUI();
         }
 
-        /// <summary>
-        /// Builds the harvest option slots (normal + upgrade if available).
-        /// </summary>
         private void BuildUI()
         {
-            foreach (Transform child in gridParent)
+            foreach (Transform child in optionParent)
                 Destroy(child.gameObject);
-            slots.Clear();
 
-            // Always add Normal Harvest option (null means default)
-            var normalSlotGO = Instantiate(harvestSelectionSlotPrefab, gridParent);
-            var normalSlotUI = normalSlotGO.GetComponent<SelectionSlotUI>();
-            normalSlotUI.Initialize(null, OnHarvestOptionSelected);
-            normalSlotUI.SetSelected(_currentSelectedHarvestOption == null);
-            slots.Add(normalSlotUI);
+            _slots.Clear();
 
-            // If Harvest Upgrade equipped, add its option
-            var harvestUpgrade = _equipSystem?.harvestUpgrade;
-            if (harvestUpgrade != null)
+            var equippedHarvest = _equipSystem.harvestTool;
+
+            // Always show hands slot
+            var handsGO = Instantiate(optionPrefab, optionParent);
+            var handsSlot = handsGO.GetComponent<SelectionSlotUI>();
+            handsSlot.SetHandsTooltip(
+                "Hands (Nothing Equipped)",
+                "No harvest tool equipped. You'll harvest by hand (less efficient)!"
+            );
+            handsSlot.Initialize(null, OnOptionSelected);
+            handsSlot.SetSelected(equippedHarvest == null);
+            _slots.Add(handsSlot);
+
+            // Show equipped harvest tool if present
+            if (equippedHarvest != null)
             {
-                var upgradeGO = Instantiate(harvestSelectionSlotPrefab, gridParent);
-                var upgradeSlotUI = upgradeGO.GetComponent<SelectionSlotUI>();
-                upgradeSlotUI.Initialize(harvestUpgrade, OnHarvestOptionSelected);
-                upgradeSlotUI.SetSelected(harvestUpgrade == _currentSelectedHarvestOption);
-                slots.Add(upgradeSlotUI);
+                var slotUI = Instantiate(optionPrefab, optionParent).GetComponent<SelectionSlotUI>();
+                slotUI.Initialize(equippedHarvest, OnOptionSelected);
+                slotUI.SetSelected(true);
+                _slots.Add(slotUI);
             }
         }
 
-        private void RefreshUI()
+        private void OnOptionSelected(ItemData selectedItem)
         {
-            BuildUI();
+            _currentSelectedItem = selectedItem;
+            foreach (var slot in _slots)
+                slot.SetSelected(slot.Item == _currentSelectedItem);
+
+            _equipSystem.SetEquippedItem(ToolType.Harvest, selectedItem);
         }
 
-        private void OnHarvestOptionSelected(ItemData selectedItem)
-        {
-            _currentSelectedHarvestOption = selectedItem;
 
-            foreach (var slot in slots)
-                slot.SetSelected(slot.Item == _currentSelectedHarvestOption);
-            // TODO: Play SFX or give feedback if needed
-        }
+        public ItemData GetCurrentSelectedItem() => _currentSelectedItem;
 
-        public void OpenHarvestMenu()
+        private void RefreshUI() => BuildUI();
+
+        public void OpenMenu()
         {
             gameObject.SetActive(true);
             BuildUI();
             SetCanvasVisible(true);
         }
 
-        public void CloseHarvestMenu()
-        {
-            SetCanvasVisible(false);
-        }
+        public void CloseMenu() => SetCanvasVisible(false);
 
         private void SetCanvasVisible(bool visible)
         {
@@ -95,11 +95,6 @@ namespace HairvestMoon.UI
             _canvasGroup.alpha = visible ? 1f : 0f;
             _canvasGroup.interactable = visible;
             _canvasGroup.blocksRaycasts = visible;
-        }
-
-        public ItemData GetCurrentSelectedItem()
-        {
-            return _currentSelectedHarvestOption;
         }
     }
 }

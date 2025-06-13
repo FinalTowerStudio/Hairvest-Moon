@@ -151,13 +151,13 @@ namespace HairvestMoon.Core
         public void OnJump(InputAction.CallbackContext context) { }
         public void OnNext(InputAction.CallbackContext context)
         {
-            if (context.performed && !_inputLocked)
+            if (context.performed)
                 _eventBus.RaiseToolNext();
         }
 
         public void OnPrevious(InputAction.CallbackContext context)
         {
-            if (context.performed && !_inputLocked)
+            if (context.performed)
                 _eventBus.RaiseToolPrevious();
         }
 

@@ -70,7 +70,7 @@ namespace HairvestMoon.Player
             if (_stamina > 0)
             {
                 _stamina = Mathf.Max(0, _stamina - 1);
-                Debug.Log($"[Player_Controller] Stamina updated: {_stamina}/{MaxStamina}");
+                //Debug.Log($"[Player_Controller] Stamina updated: {_stamina}/{MaxStamina}");
                 // TODO: Raise event for stamina update/UI if needed
             }
         }

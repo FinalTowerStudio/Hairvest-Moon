@@ -257,3 +257,4 @@ MonoBehaviour:
   iconImage: {fileID: 4719403460905755963}
   highlightObj: {fileID: 6537563905521758625}
   button: {fileID: 7718693411956335515}
+  handIcon: {fileID: -1624108181874779714, guid: b33cba13a2658a04dbd0683eb8062191, type: 3}

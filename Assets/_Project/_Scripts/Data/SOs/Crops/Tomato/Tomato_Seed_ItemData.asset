@@ -15,7 +15,8 @@ MonoBehaviour:
   itemID: Tomato_Seed
   itemName: Tomato
   description: Seed to grow tomoato
-  itemIcon: {fileID: -4831927542099238266, guid: 80b481319a15aae44b393c52687c1cb0, type: 3}
+  itemIcon: {fileID: -8283006645461201991, guid: cc50e931645622a42aa80a1fbf1571df, type: 3}
   itemType: 1
   toolType: 3
   sellPrice: 2
+  maxStack: 99
