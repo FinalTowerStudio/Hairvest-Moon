@@ -129,20 +129,40 @@ namespace HairvestMoon.Farming
 
             if (!_activeTile.HasValue) return;
 
+<<<<<<< HEAD
             var tile = _activeTile.Value;
             var tool = _toolSystem.CurrentTool;
+=======
+            var tile = targetTile.Value;
+            var data = ServiceLocator.Get<FarmTileDataManager>().GetTileData(tile);
+            var equipSystem = ServiceLocator.Get<BackpackEquipSystem>();
+>>>>>>> 87c96bf6d5dda68fa5bbfb48168eacf15bb85af1
 
             switch (tool)
             {
                 case ToolType.Hoe:
+<<<<<<< HEAD
                     if (_tileDataManager.CanTill(tile))
                     {
                         _tileDataManager.SetTilled(tile, true);
                         ShowDebug("Tile tilled!");
                     }
                     else ShowDebug("Can't till here.");
+=======
+                    if (equipSystem.hoeTool == null)
+                    {
+                        ShowDebug("Tilling with hands (no hoe equipped).");
+                        // TODO: Hands penalty here
+                    }
+                    else
+                    {
+                        ShowDebug("Tilling with equipped hoe!");
+                    }
+                    TryTill(tile, data);
+>>>>>>> 87c96bf6d5dda68fa5bbfb48168eacf15bb85af1
                     break;
                 case ToolType.WateringCan:
+<<<<<<< HEAD
                     if (_tileDataManager.CanWater(tile))
                     {
                         _tileDataManager.SetWatered(tile, true);
@@ -150,8 +170,19 @@ namespace HairvestMoon.Farming
                         ShowDebug("Tile watered!");
                     }
                     else ShowDebug("Can't water here.");
+=======
+                    if (equipSystem.wateringTool == null)
+                    {
+                        ShowDebug("You have not equipped a watering can!");
+                        // TODO: Play error sound
+                        return; // Block action
+                    }
+                    ShowDebug("Watering with can.");
+                    TryWater(tile, data);
+>>>>>>> 87c96bf6d5dda68fa5bbfb48168eacf15bb85af1
                     break;
                 case ToolType.Seed:
+<<<<<<< HEAD
                     var selectedSeed = _toolSystem.GetCurrentSelectedSeed();
                     if (_tileDataManager.CanPlant(tile, selectedSeed))
                     {
@@ -160,8 +191,12 @@ namespace HairvestMoon.Farming
                         ShowDebug($"Planted {selectedSeed?.cropData.cropName ?? "seed"}!");
                     }
                     else ShowDebug("Can't plant here.");
+=======
+                    TryPlantSeed(tile, data); // Handles feedback internally
+>>>>>>> 87c96bf6d5dda68fa5bbfb48168eacf15bb85af1
                     break;
                 case ToolType.Harvest:
+<<<<<<< HEAD
                     if (_tileDataManager.CanHarvest(tile))
                     {
                         _tileDataManager.HarvestCrop(tile);
@@ -171,6 +206,25 @@ namespace HairvestMoon.Farming
                     else ShowDebug("Nothing to harvest.");
                     break;
             }
+=======
+                    if (equipSystem.harvestTool == null)
+                    {
+                        ShowDebug("Harvesting by hand (no tool equipped).");
+                        // TODO: Hands penalty here
+                    }
+                    else
+                    {
+                        ShowDebug("Harvesting with equipped tool!");
+                    }
+                    TryHarvest(tile, data);
+                    break;
+
+                default:
+                    ShowDebug("No tool selected");
+                    break;
+            }
+            // SFX/VFX TODO
+>>>>>>> 87c96bf6d5dda68fa5bbfb48168eacf15bb85af1
         }
 
         private void ShowSliderAtTile(Vector3Int tile)
