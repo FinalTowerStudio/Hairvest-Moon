@@ -1,4 +1,5 @@
 using HairvestMoon.Core;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -10,11 +11,13 @@ namespace HairvestMoon.Farming
     public class CropVisualSystem : MonoBehaviour, IBusListener
     {
         [SerializeField] private Tilemap cropTilemap;
-        [SerializeField] private GameObject cropReadyParticlePrefab;
-        [SerializeField] private GameObject readyHighlightPrefab; //using prefab right now for simple overlay or particle effect
+        [SerializeField] private ParticleSystem cropReadyBurstPrefab;
+        [SerializeField] private ParticleSystem readyPersistentPrefab; 
 
         private bool isInitialized = false;
         private FarmTileDataManager _farmTileDataManager;
+        private Dictionary<Vector3Int, ParticleSystem> persistentReadyParticles = new();
+
 
         public void RegisterBusListeners()
         {
@@ -32,14 +35,26 @@ namespace HairvestMoon.Farming
 
         public void TriggerCropCompletedVFX(Vector3Int pos)
         {
-            // Place a particle at the crop's tile
             Vector3 worldPos = cropTilemap.CellToWorld(pos) + new Vector3(0.5f, 0.5f, 0f);
-            if (cropReadyParticlePrefab != null)
-                Instantiate(cropReadyParticlePrefab, worldPos, Quaternion.identity);
+            // Burst effect (one-shot)
+            if (cropReadyBurstPrefab != null)
+                Instantiate(cropReadyBurstPrefab, worldPos, Quaternion.identity);
 
-            // Optional: place highlight overlay
-            if (readyHighlightPrefab != null)
-                Instantiate(readyHighlightPrefab, worldPos, Quaternion.identity, cropTilemap.transform);
+            // Persistent effect (only one per tile)
+            if (readyPersistentPrefab != null && !persistentReadyParticles.ContainsKey(pos))
+            {
+                var persistentInstance = Instantiate(readyPersistentPrefab, worldPos, Quaternion.identity, cropTilemap.transform);
+                persistentReadyParticles[pos] = persistentInstance;
+            }
+        }
+
+        public void RemoveReadyParticle(Vector3Int pos)
+        {
+            if (persistentReadyParticles.TryGetValue(pos, out var ps))
+            {
+                if (ps != null) Destroy(ps.gameObject);
+                persistentReadyParticles.Remove(pos);
+            }
         }
 
         private void OnRefreshCropVisuals(GameTimeChangedArgs args)
@@ -58,7 +73,7 @@ namespace HairvestMoon.Farming
                 if (data.plantedCrop == null)
                 {
                     cropTilemap.SetTile(pos, null);
-                    // Optionally remove highlight/particle here if we pool them
+                    RemoveReadyParticle(pos);
                     continue;
                 }
 
@@ -87,10 +102,18 @@ namespace HairvestMoon.Farming
                 cropTilemap.SetTile(pos, tile);
 
                 // Add highlight if crop is fully grown
-                if (data.HasRipeCrop() && readyHighlightPrefab != null)
+                if (data.HasRipeCrop() && readyPersistentPrefab != null)
                 {
                     Vector3 worldPos = cropTilemap.CellToWorld(pos) + new Vector3(0.5f, 0.5f, 0f);
-                    Instantiate(readyHighlightPrefab, worldPos, Quaternion.identity, cropTilemap.transform);
+                    if (!persistentReadyParticles.ContainsKey(pos))
+                    {
+                        var persistentInstance = Instantiate(readyPersistentPrefab, worldPos, Quaternion.identity, cropTilemap.transform);
+                        persistentReadyParticles[pos] = persistentInstance;
+                    }
+                }
+                else
+                {
+                    RemoveReadyParticle(pos); // Crop not ready, remove any stray persistent effect
                 }
             }
         }

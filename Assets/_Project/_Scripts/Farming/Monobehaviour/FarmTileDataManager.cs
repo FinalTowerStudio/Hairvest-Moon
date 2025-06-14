@@ -91,8 +91,9 @@ namespace HairvestMoon.Farming
         public bool CanPlant(Vector3Int cell, SeedData seed)
         {
             var data = GetTileData(cell);
-            return IsFarmTile(cell) && data.isTilled && !data.isWatered && data.plantedCrop == null && seed != null;
+            return IsFarmTile(cell) && data.isTilled && data.plantedCrop == null && seed != null;
         }
+
         public bool CanHarvest(Vector3Int cell)
         {
             var data = GetTileData(cell);
@@ -142,7 +143,14 @@ namespace HairvestMoon.Farming
                 overlayFarmTilemap.SetTile(pos, null);
                 return;
             }
-            overlayFarmTilemap.SetTile(pos, data.isWatered ? wateredOverlayTile : null);
+            else
+            {
+                overlayFarmTilemap.SetTile(pos, data.isWatered ? wateredOverlayTile : null);
+            }
+
+            var waterVisualSystem = ServiceLocator.Get<WaterVisualSystem>();
+            if (waterVisualSystem != null)
+                waterVisualSystem.HandleWateredTile(pos, data);
         }
 
         public void RemoveTile(Vector3Int pos)

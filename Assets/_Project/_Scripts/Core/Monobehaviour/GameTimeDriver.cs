@@ -1,5 +1,4 @@
 using UnityEngine;
-using HairvestMoon.Core;
 using System;
 
 namespace HairvestMoon.Core
@@ -11,9 +10,13 @@ namespace HairvestMoon.Core
     /// </summary>
     public class GameTimeDriver : MonoBehaviour, IBusListener
     {
-        [Header("Debug Controls")]
+#if UNITY_EDITOR
+        [Header("Debug Time Controls")]
+        [Range(0.1f, 100f)]
+        [SerializeField] private float debugTimeScale = 1f;
         [Tooltip("Tick is auto-paused in menu/cutscene unless forced running by this flag.")]
         [SerializeField] private bool _forceTick = false;
+#endif
 
         private bool _canTick = false;
         private GameTimeManager _gameTimeManager;
@@ -55,12 +58,23 @@ namespace HairvestMoon.Core
         private void Update()
         {
             if (!_canTick) return;
-            if (_autoPaused && !_forceTick && !_hasStepped) return;
 
-            _gameTimeManager.Tick(Time.deltaTime);
+#if UNITY_EDITOR
+            var timeManager = ServiceLocator.Get<GameTimeManager>();
+            if (timeManager != null && Mathf.Abs(debugTimeScale - timeManager.TimeScale) > 0.01f)
+                timeManager.SetTimeScale(debugTimeScale);
+#endif
 
-            if (_hasStepped)
-                _hasStepped = false; // Reset one-step after ticking once
+            // Only tick if not auto-paused, unless forced for debug
+            if (IsTicking)
+            {
+                _gameTimeManager?.Tick(Time.deltaTime);
+            }
+            else if (_hasStepped)
+            {
+                _gameTimeManager?.Tick(Time.deltaTime);
+                _hasStepped = false;
+            }
         }
 
         // --- Inspector/Editor Control ---
@@ -77,7 +91,7 @@ namespace HairvestMoon.Core
             _hasStepped = true;
         }
 
-        public bool IsTicking => !_autoPaused || _forceTick;
+        public bool IsTicking => (!_autoPaused) || _forceTick;
 
         // Optionally expose Pause/Resume methods for runtime scripting or debug overlay UI.
     }

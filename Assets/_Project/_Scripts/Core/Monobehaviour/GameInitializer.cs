@@ -118,7 +118,6 @@ namespace HairvestMoon.Core
             _resourceInventoryUI.InitializeUI();
             _mainMenuUI.InitializeUI();
             _backpackCapacityBarUI.InitializeUI();
-            _debugOverlayUI.InitializeUI();
         }
 
         /// <summary>
@@ -148,6 +147,7 @@ namespace HairvestMoon.Core
             _tileTargetingSystem.RegisterBusListeners();
             _toolSystem.RegisterBusListeners();
             _toolSelector.RegisterBusListeners();
+            _debugOverlayUI.RegisterBusListeners();
             //_selectionTooltipUI.RegisterBusListeners();
             ServiceLocator.Get<PlayerFacingController>().RegisterBusListeners();
             ServiceLocator.Get<GameStateManager>().RegisterBusListeners();

@@ -56,9 +56,19 @@ namespace HairvestMoon.UI
                     seedsInInventory.Add(seedData.seedItem);
             }
 
+            // Determine what to select
+            ItemData selectionToRestore = null;
+            // If current selection is still present, keep it
+            if (_currentSelectedItem != null && seedsInInventory.Contains(_currentSelectedItem))
+                selectionToRestore = _currentSelectedItem;
+            // Else, auto-select first available (if any)
+            else if (seedsInInventory.Count > 0)
+                selectionToRestore = seedsInInventory[0];
+            // Else, fallback to null/hands
+
+            // No seeds left: show hands/empty slot only
             if (seedsInInventory.Count == 0)
             {
-                // Add a "hands"/empty slot as the only option
                 var handsGO = Instantiate(seedSlotPrefab, seedGridParent);
                 var handsSlotUI = handsGO.GetComponent<SelectionSlotUI>();
                 handsSlotUI.SetHandsTooltip(
@@ -70,7 +80,7 @@ namespace HairvestMoon.UI
                 slots.Add(handsSlotUI);
 
                 _currentSelectedItem = null;
-                //farmToolHandler.SetSelectedSeed(null);
+                // Optionally fire selection changed bus event here!
                 return;
             }
 
@@ -80,14 +90,17 @@ namespace HairvestMoon.UI
                 var slotGO = Instantiate(seedSlotPrefab, seedGridParent);
                 var slotUI = slotGO.GetComponent<SelectionSlotUI>();
                 slotUI.Initialize(item, OnSeedSelected);
-                slotUI.SetSelected(item == _currentSelectedItem);
+                slotUI.SetSelected(item == selectionToRestore);
                 slots.Add(slotUI);
             }
 
-            // If no selection is active, auto-select first seed
-            if (_currentSelectedItem == null)
-                OnSeedSelected(seedsInInventory[0]);
+            // Finalize selection
+            _currentSelectedItem = selectionToRestore;
+            SetSelectedSeed(_currentSelectedItem);
+
+            // Optionally fire selection changed event here as well!
         }
+
 
         private void OnSeedSelected(ItemData selectedItem)
         {
@@ -97,8 +110,8 @@ namespace HairvestMoon.UI
             foreach (var slot in slots)
                 slot.SetSelected(slot.Item == _currentSelectedItem);
 
-            // Raise selection changed event
-            ServiceLocator.Get<GameEventBus>().RaiseSeedSelectionChanged(_currentSelectedItem);
+            // Raise selection changed event -- Not Currently Used
+            // ServiceLocator.Get<GameEventBus>().RaiseSeedSelectionChanged(_currentSelectedItem);
         }
 
 

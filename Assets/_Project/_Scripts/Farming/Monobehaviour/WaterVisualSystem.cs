@@ -35,6 +35,7 @@ namespace HairvestMoon.Farming
 
         public void Tick(GameTimeChangedArgs args)
         {
+            if (!isInitialized) return;
             foreach (var entry in activeSliders)
             {
                 var pos = entry.Key;
@@ -46,6 +47,7 @@ namespace HairvestMoon.Farming
 
         private void Update()
         {
+            if (!isInitialized) return;
             foreach (var entry in activeSliders)
             {
                 var pos = entry.Key;
@@ -91,9 +93,20 @@ namespace HairvestMoon.Farming
 
         private void CreateSlider(Vector3Int pos)
         {
+            Debug.Log($"Creating slider for {pos}");
             var worldPos = farmGrid.CellToWorld(pos) + new Vector3(0.5f, tileOffsetY, 0);
-            var instance = Instantiate(waterSliderPrefab, worldPos, Quaternion.identity, transform);
-            activeSliders[pos] = new WaterSliderInstance(instance);
+            var instanceObj = Instantiate(waterSliderPrefab, worldPos, Quaternion.identity, transform);
+
+            // Get the correct initial fill value based on water remaining
+            var data = _farmTileDataManager.GetTileData(pos);
+            float initialFill = 1f; // fallback
+            if (data != null && FarmTileData.MinutesPerWatering > 0)
+                initialFill = Mathf.Clamp01(data.waterMinutesRemaining / (float)FarmTileData.MinutesPerWatering);
+
+            var instance = new WaterSliderInstance(instanceObj);
+            instance.SetFill(initialFill); 
+            activeSliders[pos] = instance;
+            targetSliderFill[pos] = initialFill;
         }
 
         private void RemoveSlider(Vector3Int pos)

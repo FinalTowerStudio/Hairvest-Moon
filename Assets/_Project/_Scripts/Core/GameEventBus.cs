@@ -95,7 +95,7 @@ namespace HairvestMoon.Core
         public event Action<ToolType> ToolChanged;
         public void RaiseToolChanged(ToolType tool) => ToolChanged?.Invoke(tool);
 
-        public event System.Action<ItemData> SeedSelectionChanged;
+        public event Action<ItemData> SeedSelectionChanged;
         public void RaiseSeedSelectionChanged(ItemData item) => SeedSelectionChanged?.Invoke(item);
 
 

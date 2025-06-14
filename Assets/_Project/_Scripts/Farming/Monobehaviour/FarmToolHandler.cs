@@ -187,7 +187,13 @@ namespace HairvestMoon.Farming
                     if (_tileDataManager.CanPlant(tile, selectedSeed))
                     {
                         _tileDataManager.PlantSeed(tile, selectedSeed);
-                        // TODO: Remove seed from inventory, etc.
+
+                        if (selectedSeed != null && selectedSeed.seedItem != null)
+                        {
+                            var resourceInventory = ServiceLocator.Get<ResourceInventorySystem>();
+                            resourceInventory?.RemoveItem(selectedSeed.seedItem, 1);
+                        }
+
                         ShowDebug($"Planted {selectedSeed?.cropData.cropName ?? "seed"}!");
                     }
                     else
@@ -199,8 +205,22 @@ namespace HairvestMoon.Farming
                 case ToolType.Harvest:
                     if (_tileDataManager.CanHarvest(tile))
                     {
-                        _tileDataManager.HarvestCrop(tile);
-                        // TODO: Add crop to inventory.
+                        var cropData = data.plantedCrop;
+
+                        _tileDataManager.HarvestCrop(tile); // This clears the crop from the tile
+
+                        // --- Award crop to inventory if one existed ---
+                        if (cropData != null)
+                        {
+                            var item = cropData.GetHarvestItem();
+                            if (item != null)
+                            {
+                                int amount = cropData.harvestYield > 0 ? cropData.harvestYield : 1;
+                                var resourceInventory = ServiceLocator.Get<ResourceInventorySystem>();
+                                resourceInventory?.AddItem(item, amount);
+                            }
+                        }
+
                         if (_equipSystem.harvestTool == null)
                         {
                             ShowDebug("Harvesting by hand (no tool equipped).");
@@ -216,8 +236,9 @@ namespace HairvestMoon.Farming
                     {
                         ShowDebug("Nothing to harvest.");
                     }
-                    // TODO: SFX/VFX
                     break;
+
+
                 default:
                     ShowDebug("No tool selected");
                     break;

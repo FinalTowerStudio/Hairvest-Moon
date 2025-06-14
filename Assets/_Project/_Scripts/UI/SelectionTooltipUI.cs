@@ -1,6 +1,5 @@
 ﻿using TMPro;
 using UnityEngine;
-using HairvestMoon.Inventory;
 
 namespace HairvestMoon.UI
 {
